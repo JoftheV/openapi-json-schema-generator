@@ -5,7 +5,6 @@ import org.junit.Test;
 import org.openapijsonschematools.client.configurations.JsonSchemaKeywordFlags;
 import org.openapijsonschematools.client.configurations.SchemaConfiguration;
 import org.openapijsonschematools.client.exceptions.ValidationException;
-import org.openapijsonschematools.client.exceptions.InvalidTypeException;
 import org.openapijsonschematools.client.schemas.validation.MapUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
@@ -15,7 +14,7 @@ import java.util.Map;
 import java.util.AbstractMap;
 
 public class EnumWithEscapedCharactersTest {
-    static final SchemaConfiguration configuration = new SchemaConfiguration(JsonSchemaKeywordFlags.onlyFormat());
+    static final SchemaConfiguration configuration = new SchemaConfiguration(new JsonSchemaKeywordFlags.Builder().format().build());
 
     @Test
     public void testAnotherStringIsInvalidFails() {
@@ -27,13 +26,13 @@ public class EnumWithEscapedCharactersTest {
                 configuration
             );
             throw new RuntimeException("A different exception must be thrown");
-        } catch (ValidationException | InvalidTypeException ignored) {
+        } catch (ValidationException ignored) {
             ;
         }
     }
 
     @Test
-    public void testMember2IsValidPasses() {
+    public void testMember2IsValidPasses() throws ValidationException {
         // member 2 is valid
         final var schema = EnumWithEscapedCharacters.EnumWithEscapedCharacters1.getInstance();
         schema.validate(
@@ -43,7 +42,7 @@ public class EnumWithEscapedCharactersTest {
     }
 
     @Test
-    public void testMember1IsValidPasses() {
+    public void testMember1IsValidPasses() throws ValidationException {
         // member 1 is valid
         final var schema = EnumWithEscapedCharacters.EnumWithEscapedCharacters1.getInstance();
         schema.validate(

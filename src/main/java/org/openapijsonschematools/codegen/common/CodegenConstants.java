@@ -143,6 +143,8 @@ public class CodegenConstants {
 
     public static final String SOURCE_FOLDER = "sourceFolder";
     public static final String SOURCE_FOLDER_DESC = "source folder for generated code";
+    public static final String BUILD_TOOL = "buildTool";
+    public static final String BUILD_TOOL_DESC = "the build automation tool used in generated code";
 
     public static final String IMPL_FOLDER = "implFolder";
     public static final String IMPL_FOLDER_DESC = "folder for generated implementation code";
@@ -363,6 +365,10 @@ public class CodegenConstants {
 
     public static final String INIT_REQUIRED_VARS = "initRequiredVars";
     public static final String INIT_REQUIRED_VARS_DESC = "If set to true then the required variables are included as positional arguments in __init__ and _from_openapi_data methods. Note: this can break some composition use cases. To learn more read PR #8802.";
+
+    public static final String INTS_ALLOWED_FOR_FLOAT_DOUBLE_FORMATS = "intsAllowedForFloatDoubleFormats";
+
+    public static final String INTS_ALLOWED_FOR_FLOAT_DOUBLE_FORMATS_DESC = "Integers are allowed in for type: number format:float/double payloads";
 
     public static final String NON_COMPLIANT_USE_DISCR_IF_COMPOSITION_FAILS = "nonCompliantUseDiscriminatorIfCompositionFails";
 

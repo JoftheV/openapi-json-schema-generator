@@ -3,6 +3,8 @@ package org.openapijsonschematools.client.requestbody;
 import org.openapijsonschematools.client.configurations.JsonSchemaKeywordFlags;
 import org.openapijsonschematools.client.configurations.SchemaConfiguration;
 import org.openapijsonschematools.client.contenttype.ContentTypeDetector;
+import org.openapijsonschematools.client.exceptions.NotImplementedException;
+import org.openapijsonschematools.client.exceptions.ValidationException;
 import org.openapijsonschematools.client.schemas.AnyTypeJsonSchema;
 import org.openapijsonschematools.client.schemas.StringJsonSchema;
 
@@ -47,7 +49,7 @@ public final class RequestBodySerializerTest {
                     true);
         }
 
-        public SerializedRequestBody serialize(SealedRequestBody requestBody) {
+        public SerializedRequestBody serialize(SealedRequestBody requestBody) throws NotImplementedException {
             if (requestBody instanceof ApplicationjsonRequestBody requestBody0) {
                 return serialize(requestBody0.contentType(), requestBody0.body().getData());
             } else {
@@ -93,8 +95,8 @@ public final class RequestBodySerializerTest {
     }
 
     @Test
-    public void testSerializeApplicationJson() {
-        SchemaConfiguration configuration = new SchemaConfiguration(JsonSchemaKeywordFlags.ofNone());
+    public void testSerializeApplicationJson() throws ValidationException, NotImplementedException {
+        SchemaConfiguration configuration = new SchemaConfiguration(new JsonSchemaKeywordFlags.Builder().build());
         var serializer = new MyRequestBodySerializer();
         String jsonBody;
         SerializedRequestBody requestBody = serializer.serialize(
@@ -164,8 +166,8 @@ public final class RequestBodySerializerTest {
     }
 
     @Test
-    public void testSerializeTextPlain() {
-        SchemaConfiguration configuration = new SchemaConfiguration(JsonSchemaKeywordFlags.ofNone());
+    public void testSerializeTextPlain() throws ValidationException, NotImplementedException {
+        SchemaConfiguration configuration = new SchemaConfiguration(new JsonSchemaKeywordFlags.Builder().build());
         var serializer = new MyRequestBodySerializer();
         SerializedRequestBody requestBody = serializer.serialize(
             new TextplainRequestBody(

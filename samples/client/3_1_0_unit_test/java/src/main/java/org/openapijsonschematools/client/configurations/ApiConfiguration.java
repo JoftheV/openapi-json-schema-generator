@@ -12,41 +12,90 @@ import java.util.HashMap;
 
 public class ApiConfiguration {
     private final ServerInfo serverInfo;
+    private final ServerIndexInfo serverIndexInfo;
     private final @Nullable Duration timeout;
+    private final Map<String, List< String>> defaultHeaders;
 
     public ApiConfiguration() {
-        serverInfo = new ServerInfo();
+        serverInfo = new ServerInfoBuilder().build();
+        serverIndexInfo = new ServerIndexInfoBuilder().build();
         timeout = null;
+        defaultHeaders = new HashMap<>();
     }
 
-    public ApiConfiguration(ServerInfo serverInfo, Duration timeout) {
+    public ApiConfiguration(ServerInfo serverInfo, ServerIndexInfo serverIndexInfo, Duration timeout, Map<String, List< String>> defaultHeaders) {
         this.serverInfo = serverInfo;
+        this.serverIndexInfo = serverIndexInfo;
         this.timeout = timeout;
+        this.defaultHeaders = defaultHeaders;
     }
 
     public static class ServerInfo {
-        protected final RootServerInfo rootServerInfo;
+        final RootServerInfo.RootServerInfo1 rootServerInfo;
 
-        public ServerInfo() {
-            rootServerInfo = new RootServerInfo();
+        ServerInfo(
+            RootServerInfo. @Nullable RootServerInfo1 rootServerInfo
+        ) {
+            this.rootServerInfo = Objects.requireNonNullElse(rootServerInfo, new RootServerInfo.RootServerInfoBuilder().build());
+        }
+    }
+
+    public static class ServerInfoBuilder {
+        private RootServerInfo. @Nullable RootServerInfo1 rootServerInfo;
+        public ServerInfoBuilder() {}
+
+        public ServerInfoBuilder rootServerInfo(RootServerInfo.RootServerInfo1 rootServerInfo) {
+            this.rootServerInfo = rootServerInfo;
+            return this;
         }
 
-        public ServerInfo(
-            @Nullable RootServerInfo rootServerInfo
+        public ServerInfo build() {
+            return new ServerInfo(
+                rootServerInfo
+            );
+        }
+    }
+
+    public static class ServerIndexInfo {
+        final RootServerInfo.ServerIndex rootServerInfoServerIndex;
+
+        ServerIndexInfo(
+            RootServerInfo. @Nullable ServerIndex rootServerInfoServerIndex
         ) {
-            this.rootServerInfo = Objects.requireNonNullElseGet(rootServerInfo, RootServerInfo::new);
+            this.rootServerInfoServerIndex = Objects.requireNonNullElse(rootServerInfoServerIndex, RootServerInfo.ServerIndex.SERVER_0);
+        }
+    }
+
+    public static class ServerIndexInfoBuilder {
+        private RootServerInfo. @Nullable ServerIndex rootServerInfoServerIndex;
+        public ServerIndexInfoBuilder() {}
+
+        public ServerIndexInfoBuilder rootServerInfoServerIndex(RootServerInfo.ServerIndex serverIndex) {
+            this.rootServerInfoServerIndex = serverIndex;
+            return this;
+        }
+
+        public ServerIndexInfo build() {
+            return new ServerIndexInfo(
+                rootServerInfoServerIndex
+            );
         }
     }
 
     public Server getServer(RootServerInfo. @Nullable ServerIndex serverIndex) {
-        return serverInfo.rootServerInfo.getServer(serverIndex);
+        var serverProvider = serverInfo.rootServerInfo;
+        if (serverIndex == null) {
+            RootServerInfo.ServerIndex configServerIndex = serverIndexInfo.rootServerInfoServerIndex;
+            return serverProvider.getServer(configServerIndex);
+        }
+        return serverProvider.getServer(serverIndex);
     }
 
     public Map<String, List< String>> getDefaultHeaders() {
-        return new HashMap<>();
+        return defaultHeaders;
     }
 
-    public@Nullable Duration getTimeout() {
+    public @Nullable Duration getTimeout() {
         return timeout;
     }
 }

@@ -1,7 +1,6 @@
 package {{{packageName}}}.configurations;
 
 {{#gt allSecurity.size 0}}
-import {{{packageName}}}.exceptions.UnsetPropertyException;
 import {{{packageName}}}.securityrequirementobjects.SecurityRequirementObject;
 {{/gt}}
 import {{{packageName}}}.servers.Server;
@@ -32,6 +31,7 @@ import java.util.HashMap;
 
 public class ApiConfiguration {
     private final ServerInfo serverInfo;
+    private final ServerIndexInfo serverIndexInfo;
     {{#gt allSecurity.size 0}}
     private final SecurityInfo securityInfo;
     private final SecurityIndexInfo securityIndexInfo;
@@ -40,21 +40,25 @@ public class ApiConfiguration {
     {{#if securitySchemes}}
     private final Map<Class<? extends SecurityScheme>, SecurityScheme> securitySchemeInfo;
     {{/if}}
+    private final Map<String, List< String>> defaultHeaders;
 
     public ApiConfiguration() {
-        serverInfo = new ServerInfo();
+        serverInfo = new ServerInfoBuilder().build();
+        serverIndexInfo = new ServerIndexInfoBuilder().build();
     {{#gt allSecurity.size 0}}
         securityInfo = new SecurityInfo();
-        securityIndexInfo = new SecurityIndexInfo();
+        securityIndexInfo = new SecurityIndexInfoBuilder().build();
     {{/gt}}
     {{#if securitySchemes}}
         securitySchemeInfo = new HashMap<>();
     {{/if}}
         timeout = null;
+        defaultHeaders = new HashMap<>();
     }
 
-    public ApiConfiguration(ServerInfo serverInfo{{#gt allSecurity.size 0}}, SecurityIndexInfo securityIndexInfo{{/gt}}{{#if securitySchemes}}, List<SecurityScheme> securitySchemes{{/if}}, Duration timeout) {
+    public ApiConfiguration(ServerInfo serverInfo, ServerIndexInfo serverIndexInfo{{#if securitySchemes}}, List<SecurityScheme> securitySchemes{{/if}}{{#gt allSecurity.size 0}}, SecurityIndexInfo securityIndexInfo{{/gt}}, Duration timeout, Map<String, List< String>> defaultHeaders) {
         this.serverInfo = serverInfo;
+        this.serverIndexInfo = serverIndexInfo;
     {{#gt allSecurity.size 0}}
         this.securityInfo = new SecurityInfo();
         this.securityIndexInfo = securityIndexInfo;
@@ -66,33 +70,93 @@ public class ApiConfiguration {
         }
     {{/if}}
         this.timeout = timeout;
+        this.defaultHeaders = defaultHeaders;
     }
 
     public static class ServerInfo {
     {{#each allServers}}
-        protected final {{jsonPathPiece.pascalCase}} {{jsonPathPiece.camelCase}};
+        final {{jsonPathPiece.pascalCase}}.{{jsonPathPiece.pascalCase}}1 {{jsonPathPiece.camelCase}};
     {{/each}}
 
-        public ServerInfo() {
+        ServerInfo(
     {{#each allServers}}
-            {{jsonPathPiece.camelCase}} = new {{jsonPathPiece.pascalCase}}();
-    {{/each}}
-        }
-
-        public ServerInfo(
-    {{#each allServers}}
-            @Nullable {{jsonPathPiece.pascalCase}} {{jsonPathPiece.camelCase}}{{#unless @last}},{{/unless}}
+            {{jsonPathPiece.pascalCase}}. @Nullable {{jsonPathPiece.pascalCase}}1 {{jsonPathPiece.camelCase}}{{#unless @last}},{{/unless}}
     {{/each}}
         ) {
     {{#each allServers}}
-            this.{{jsonPathPiece.camelCase}} = Objects.requireNonNullElseGet({{jsonPathPiece.camelCase}}, {{jsonPathPiece.pascalCase}}::new);
+            this.{{jsonPathPiece.camelCase}} = Objects.requireNonNullElse({{jsonPathPiece.camelCase}}, new {{jsonPathPiece.pascalCase}}.{{jsonPathPiece.pascalCase}}Builder().build());
     {{/each}}
         }
     }
 
+    public static class ServerInfoBuilder {
     {{#each allServers}}
+        private {{jsonPathPiece.pascalCase}}. @Nullable {{jsonPathPiece.pascalCase}}1 {{jsonPathPiece.camelCase}};
+    {{/each}}
+        public ServerInfoBuilder() {}
+    {{#each allServers}}
+
+        public ServerInfoBuilder {{jsonPathPiece.camelCase}}({{jsonPathPiece.pascalCase}}.{{jsonPathPiece.pascalCase}}1 {{jsonPathPiece.camelCase}}) {
+            this.{{jsonPathPiece.camelCase}} = {{jsonPathPiece.camelCase}};
+            return this;
+        }
+    {{/each}}
+
+        public ServerInfo build() {
+            return new ServerInfo(
+    {{#each allServers}}
+                {{jsonPathPiece.camelCase}}{{#unless @last}},{{/unless}}
+    {{/each}}
+            );
+        }
+    }
+
+    public static class ServerIndexInfo {
+    {{#each allServers}}
+        final {{jsonPathPiece.pascalCase}}.ServerIndex {{jsonPathPiece.camelCase}}ServerIndex;
+    {{/each}}
+
+        ServerIndexInfo(
+    {{#each allServers}}
+            {{jsonPathPiece.pascalCase}}. @Nullable ServerIndex {{jsonPathPiece.camelCase}}ServerIndex{{#unless @last}},{{/unless}}
+    {{/each}}
+        ) {
+    {{#each allServers}}
+            this.{{jsonPathPiece.camelCase}}ServerIndex = Objects.requireNonNullElse({{jsonPathPiece.camelCase}}ServerIndex, {{jsonPathPiece.pascalCase}}.ServerIndex.SERVER_0);
+    {{/each}}
+        }
+    }
+
+    public static class ServerIndexInfoBuilder {
+    {{#each allServers}}
+        private {{jsonPathPiece.pascalCase}}. @Nullable ServerIndex {{jsonPathPiece.camelCase}}ServerIndex;
+    {{/each}}
+        public ServerIndexInfoBuilder() {}
+    {{#each allServers}}
+
+        public ServerIndexInfoBuilder {{jsonPathPiece.camelCase}}ServerIndex({{jsonPathPiece.pascalCase}}.ServerIndex serverIndex) {
+            this.{{jsonPathPiece.camelCase}}ServerIndex = serverIndex;
+            return this;
+        }
+    {{/each}}
+
+        public ServerIndexInfo build() {
+            return new ServerIndexInfo(
+    {{#each allServers}}
+                {{jsonPathPiece.camelCase}}ServerIndex{{#unless @last}},{{/unless}}
+    {{/each}}
+            );
+        }
+    }
+    {{#each allServers}}
+
     public Server getServer({{jsonPathPiece.pascalCase}}. @Nullable ServerIndex serverIndex) {
-        return serverInfo.{{jsonPathPiece.camelCase}}.getServer(serverIndex);
+        var serverProvider = serverInfo.{{jsonPathPiece.camelCase}};
+        if (serverIndex == null) {
+            {{jsonPathPiece.pascalCase}}.ServerIndex configServerIndex = serverIndexInfo.{{jsonPathPiece.camelCase}}ServerIndex;
+            return serverProvider.getServer(configServerIndex);
+        }
+        return serverProvider.getServer(serverIndex);
     }
     {{/each}}
     {{#gt allSecurity.size 0}}
@@ -111,27 +175,47 @@ public class ApiConfiguration {
 
     public static class SecurityIndexInfo {
         {{#each allSecurity}}
-        protected {{jsonPathPiece.pascalCase}}. @Nullable SecurityIndex {{jsonPathPiece.camelCase}}SecurityIndex;
+        final {{jsonPathPiece.pascalCase}}.SecurityIndex {{jsonPathPiece.camelCase}}SecurityIndex;
         {{/each}}
 
-        public SecurityIndexInfo() {}
-        {{#each allSecurity}}
+        SecurityIndexInfo(
+    {{#each allSecurity}}
+            {{jsonPathPiece.pascalCase}}. @Nullable SecurityIndex {{jsonPathPiece.camelCase}}SecurityIndex{{#unless @last}},{{/unless}}
+    {{/each}}
+        ) {
+    {{#each allSecurity}}
+            this.{{jsonPathPiece.camelCase}}SecurityIndex = Objects.requireNonNullElse({{jsonPathPiece.camelCase}}SecurityIndex, {{jsonPathPiece.pascalCase}}.SecurityIndex.SECURITY_0);
+    {{/each}}
+        }
+    }
 
-        public SecurityIndexInfo {{jsonPathPiece.camelCase}}SecurityIndex({{jsonPathPiece.pascalCase}}.SecurityIndex securityIndex) {
+    public static class SecurityIndexInfoBuilder {
+        {{#each allSecurity}}
+        private {{jsonPathPiece.pascalCase}}. @Nullable SecurityIndex {{jsonPathPiece.camelCase}}SecurityIndex;
+        {{/each}}
+        public SecurityIndexInfoBuilder() {}
+    {{#each allSecurity}}
+
+        public SecurityIndexInfoBuilder {{jsonPathPiece.camelCase}}SecurityIndex({{jsonPathPiece.pascalCase}}.SecurityIndex securityIndex) {
             this.{{jsonPathPiece.camelCase}}SecurityIndex = securityIndex;
             return this;
         }
-        {{/each}}
+    {{/each}}
+
+        public SecurityIndexInfo build() {
+            return new SecurityIndexInfo(
+    {{#each allSecurity}}
+                {{jsonPathPiece.camelCase}}SecurityIndex{{#unless @last}},{{/unless}}
+    {{/each}}
+            );
+        }
     }
 
         {{#each allSecurity}}
-    public SecurityRequirementObject getSecurityRequirementObject({{jsonPathPiece.pascalCase}}. @Nullable SecurityIndex securityIndex) throws UnsetPropertyException {
+    public SecurityRequirementObject getSecurityRequirementObject({{jsonPathPiece.pascalCase}}. @Nullable SecurityIndex securityIndex) {
         var securityInfoInstance = securityInfo.{{jsonPathPiece.camelCase}};
         if (securityIndex == null) {
-            {{jsonPathPiece.pascalCase}}. @Nullable SecurityIndex configSecurityIndex = securityIndexInfo.{{jsonPathPiece.camelCase}}SecurityIndex;
-            if (configSecurityIndex == null) {
-                throw new UnsetPropertyException("{{jsonPathPiece.camelCase}}SecurityIndex is unset");
-            }
+            {{jsonPathPiece.pascalCase}}.SecurityIndex configSecurityIndex = securityIndexInfo.{{jsonPathPiece.camelCase}}SecurityIndex;
             return securityInfoInstance.getSecurityRequirementObject(configSecurityIndex);
         }
         return securityInfoInstance.getSecurityRequirementObject(securityIndex);
@@ -150,10 +234,10 @@ public class ApiConfiguration {
     {{/if}}
 
     public Map<String, List< String>> getDefaultHeaders() {
-        return new HashMap<>();
+        return defaultHeaders;
     }
 
-    public@Nullable Duration getTimeout() {
+    public @Nullable Duration getTimeout() {
         return timeout;
     }
 }

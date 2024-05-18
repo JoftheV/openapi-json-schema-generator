@@ -5,7 +5,6 @@ import org.junit.Test;
 import org.openapijsonschematools.client.configurations.JsonSchemaKeywordFlags;
 import org.openapijsonschematools.client.configurations.SchemaConfiguration;
 import org.openapijsonschematools.client.exceptions.ValidationException;
-import org.openapijsonschematools.client.exceptions.InvalidTypeException;
 import org.openapijsonschematools.client.schemas.validation.MapUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
@@ -15,7 +14,7 @@ import java.util.Map;
 import java.util.AbstractMap;
 
 public class MultipleTypesCanBeSpecifiedInAnArrayTest {
-    static final SchemaConfiguration configuration = new SchemaConfiguration(JsonSchemaKeywordFlags.onlyFormat());
+    static final SchemaConfiguration configuration = new SchemaConfiguration(new JsonSchemaKeywordFlags.Builder().format().build());
 
     @Test
     public void testNullIsInvalidFails() {
@@ -27,13 +26,13 @@ public class MultipleTypesCanBeSpecifiedInAnArrayTest {
                 configuration
             );
             throw new RuntimeException("A different exception must be thrown");
-        } catch (ValidationException | InvalidTypeException ignored) {
+        } catch (ValidationException ignored) {
             ;
         }
     }
 
     @Test
-    public void testAnIntegerIsValidPasses() {
+    public void testAnIntegerIsValidPasses() throws ValidationException {
         // an integer is valid
         final var schema = MultipleTypesCanBeSpecifiedInAnArray.MultipleTypesCanBeSpecifiedInAnArray1.getInstance();
         schema.validate(
@@ -53,7 +52,7 @@ public class MultipleTypesCanBeSpecifiedInAnArrayTest {
                 configuration
             );
             throw new RuntimeException("A different exception must be thrown");
-        } catch (ValidationException | InvalidTypeException ignored) {
+        } catch (ValidationException ignored) {
             ;
         }
     }
@@ -68,7 +67,7 @@ public class MultipleTypesCanBeSpecifiedInAnArrayTest {
                 configuration
             );
             throw new RuntimeException("A different exception must be thrown");
-        } catch (ValidationException | InvalidTypeException ignored) {
+        } catch (ValidationException ignored) {
             ;
         }
     }
@@ -83,13 +82,13 @@ public class MultipleTypesCanBeSpecifiedInAnArrayTest {
                 configuration
             );
             throw new RuntimeException("A different exception must be thrown");
-        } catch (ValidationException | InvalidTypeException ignored) {
+        } catch (ValidationException ignored) {
             ;
         }
     }
 
     @Test
-    public void testAStringIsValidPasses() {
+    public void testAStringIsValidPasses() throws ValidationException {
         // a string is valid
         final var schema = MultipleTypesCanBeSpecifiedInAnArray.MultipleTypesCanBeSpecifiedInAnArray1.getInstance();
         schema.validate(
@@ -109,7 +108,7 @@ public class MultipleTypesCanBeSpecifiedInAnArrayTest {
                 configuration
             );
             throw new RuntimeException("A different exception must be thrown");
-        } catch (ValidationException | InvalidTypeException ignored) {
+        } catch (ValidationException ignored) {
             ;
         }
     }

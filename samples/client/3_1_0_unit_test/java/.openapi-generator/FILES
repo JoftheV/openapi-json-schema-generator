@@ -1,3 +1,4 @@
+.gitignore
 README.md
 docs/RootServerInfo.md
 docs/components/schemas/ASchemaGivenForPrefixitems.md
@@ -143,7 +144,7 @@ docs/components/schemas/UriReferenceFormat.md
 docs/components/schemas/UriTemplateFormat.md
 docs/components/schemas/UuidFormat.md
 docs/components/schemas/ValidateAgainstCorrectBranchThenVsElse.md
-docs/servers/Server0.md
+docs/servers/RootServer0.md
 pom.xml
 src/main/java/org/openapijsonschematools/client/RootServerInfo.java
 src/main/java/org/openapijsonschematools/client/apiclient/ApiClient.java
@@ -299,7 +300,7 @@ src/main/java/org/openapijsonschematools/client/contenttype/ContentTypeSerialize
 src/main/java/org/openapijsonschematools/client/exceptions/ApiException.java
 src/main/java/org/openapijsonschematools/client/exceptions/BaseException.java
 src/main/java/org/openapijsonschematools/client/exceptions/InvalidAdditionalPropertyException.java
-src/main/java/org/openapijsonschematools/client/exceptions/InvalidTypeException.java
+src/main/java/org/openapijsonschematools/client/exceptions/NotImplementedException.java
 src/main/java/org/openapijsonschematools/client/exceptions/UnsetPropertyException.java
 src/main/java/org/openapijsonschematools/client/exceptions/ValidationException.java
 src/main/java/org/openapijsonschematools/client/header/ContentHeader.java
@@ -425,8 +426,8 @@ src/main/java/org/openapijsonschematools/client/schemas/validation/UniqueItemsVa
 src/main/java/org/openapijsonschematools/client/schemas/validation/UnsetAnyTypeJsonSchema.java
 src/main/java/org/openapijsonschematools/client/schemas/validation/ValidationData.java
 src/main/java/org/openapijsonschematools/client/schemas/validation/ValidationMetadata.java
+src/main/java/org/openapijsonschematools/client/servers/RootServer0.java
 src/main/java/org/openapijsonschematools/client/servers/Server.java
-src/main/java/org/openapijsonschematools/client/servers/Server0.java
 src/main/java/org/openapijsonschematools/client/servers/ServerProvider.java
 src/main/java/org/openapijsonschematools/client/servers/ServerWithVariables.java
 src/main/java/org/openapijsonschematools/client/servers/ServerWithoutVariables.java

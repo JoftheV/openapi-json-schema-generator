@@ -29,18 +29,25 @@ import io.swagger.v3.oas.models.servers.Server;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.openapijsonschematools.codegen.common.ModelUtils;
+import org.openapijsonschematools.codegen.config.GeneratorSettings;
+import org.openapijsonschematools.codegen.config.WorkflowSettings;
 import org.openapijsonschematools.codegen.generators.generatormetadata.FeatureSet;
+import org.openapijsonschematools.codegen.generators.generatormetadata.GeneratorLanguage;
+import org.openapijsonschematools.codegen.generators.generatormetadata.GeneratorMetadata;
 import org.openapijsonschematools.codegen.generators.generatormetadata.Stability;
 import org.openapijsonschematools.codegen.generators.generatormetadata.features.ComponentsFeature;
+import org.openapijsonschematools.codegen.generators.generatormetadata.features.DataTypeFeature;
 import org.openapijsonschematools.codegen.generators.generatormetadata.features.GlobalFeature;
 import org.openapijsonschematools.codegen.generators.generatormetadata.features.OperationFeature;
 import org.openapijsonschematools.codegen.generators.generatormetadata.features.SchemaFeature;
 import org.openapijsonschematools.codegen.common.CodegenConstants;
 import org.openapijsonschematools.codegen.generators.generatormetadata.GeneratorType;
 import org.openapijsonschematools.codegen.generators.generatormetadata.features.SecurityFeature;
+import org.openapijsonschematools.codegen.generators.generatormetadata.features.WireFormatFeature;
 import org.openapijsonschematools.codegen.generators.models.CliOption;
 import org.openapijsonschematools.codegen.generators.openapimodels.CodegenHeader;
 import org.openapijsonschematools.codegen.generators.openapimodels.CodegenKey;
+import org.openapijsonschematools.codegen.generators.openapimodels.CodegenKeyType;
 import org.openapijsonschematools.codegen.generators.openapimodels.CodegenList;
 import org.openapijsonschematools.codegen.generators.openapimodels.CodegenParameter;
 import org.openapijsonschematools.codegen.generators.openapimodels.CodegenParametersInfo;
@@ -53,6 +60,7 @@ import org.openapijsonschematools.codegen.generators.openapimodels.CodegenSecuri
 import org.openapijsonschematools.codegen.generators.openapimodels.CodegenServer;
 import org.openapijsonschematools.codegen.generators.openapimodels.EnumInfo;
 import org.openapijsonschematools.codegen.generators.openapimodels.EnumValue;
+import org.openapijsonschematools.codegen.generators.models.GeneratedFileType;
 import org.openapijsonschematools.codegen.generators.openapimodels.MapBuilder;
 import org.openapijsonschematools.codegen.generators.openapimodels.OperationInput;
 import org.openapijsonschematools.codegen.generators.openapimodels.OperationInputProvider;
@@ -78,6 +86,93 @@ import static org.openapijsonschematools.codegen.common.StringUtils.camelize;
 import static org.openapijsonschematools.codegen.common.StringUtils.escape;
 
 public class JavaClientGenerator extends DefaultGenerator implements Generator {
+    public JavaClientGenerator(GeneratorSettings generatorSettings, WorkflowSettings workflowSettings) {
+        super(
+            generatorSettings,
+            workflowSettings,
+            "java",
+            "org.openapijsonschematools.client",
+            "openapi-java-client",
+            "generated-code" + File.separator + "java"
+        );
+        String mavenBuildTool = "maven";
+        String buildToolValue = (String) generatorSettings.getAdditionalProperties().getOrDefault(CodegenConstants.BUILD_TOOL, mavenBuildTool);
+        additionalProperties.put(CodegenConstants.BUILD_TOOL, buildToolValue);
+        String gradleBuildTool = "gradle";
+        if (buildToolValue.equals(mavenBuildTool)) {
+            supportingFiles.add(new SupportingFile("pom.hbs", "", "pom.xml").doNotOverwrite());
+        } else if (buildToolValue.equals(gradleBuildTool)) {
+            supportingFiles.add(new SupportingFile("build.gradle.hbs", "", "build.gradle.kts").doNotOverwrite());
+            supportingFiles.add(new SupportingFile("settings.gradle.hbs", "", "settings.gradle.kts").doNotOverwrite());
+        }
+        if (this.outputTestFolder.isEmpty()) {
+            setOutputTestFolder(this.generatorSettings.outputFolder);
+        }
+        // Common files
+        supportingFiles.add(new SupportingFile("README.hbs", "", "README.md").doNotOverwrite());
+        supportingFiles.add(new SupportingFile("gitignore.hbs", "", ".gitignore"));
+
+        headersSchemaFragment = "HeadersSchema";
+        supportsInheritance = true;
+
+
+        cliOptions.add(new CliOption(CodegenConstants.INVOKER_PACKAGE, CodegenConstants.INVOKER_PACKAGE_DESC).defaultValue(this.getInvokerPackage()));
+        cliOptions.add(new CliOption(CodegenConstants.GROUP_ID, CodegenConstants.GROUP_ID_DESC).defaultValue(this.getGroupId()));
+        cliOptions.add(new CliOption(CodegenConstants.ARTIFACT_VERSION, CodegenConstants.ARTIFACT_VERSION_DESC).defaultValue(ARTIFACT_VERSION_DEFAULT_VALUE));
+        cliOptions.add(new CliOption(CodegenConstants.ARTIFACT_URL, CodegenConstants.ARTIFACT_URL_DESC).defaultValue(this.getArtifactUrl()));
+        cliOptions.add(new CliOption(CodegenConstants.ARTIFACT_DESCRIPTION, CodegenConstants.ARTIFACT_DESCRIPTION_DESC).defaultValue(this.getArtifactDescription()));
+        cliOptions.add(new CliOption(CodegenConstants.SCM_CONNECTION, CodegenConstants.SCM_CONNECTION_DESC).defaultValue(this.getScmConnection()));
+        cliOptions.add(new CliOption(CodegenConstants.SCM_DEVELOPER_CONNECTION, CodegenConstants.SCM_DEVELOPER_CONNECTION_DESC).defaultValue(this.getScmDeveloperConnection()));
+        cliOptions.add(new CliOption(CodegenConstants.SCM_URL, CodegenConstants.SCM_URL_DESC).defaultValue(this.getScmUrl()));
+        cliOptions.add(new CliOption(CodegenConstants.DEVELOPER_NAME, CodegenConstants.DEVELOPER_NAME_DESC).defaultValue(this.getDeveloperName()));
+        cliOptions.add(new CliOption(CodegenConstants.DEVELOPER_EMAIL, CodegenConstants.DEVELOPER_EMAIL_DESC).defaultValue(this.getDeveloperEmail()));
+        cliOptions.add(new CliOption(CodegenConstants.DEVELOPER_ORGANIZATION, CodegenConstants.DEVELOPER_ORGANIZATION_DESC).defaultValue(this.getDeveloperOrganization()));
+        cliOptions.add(new CliOption(CodegenConstants.DEVELOPER_ORGANIZATION_URL, CodegenConstants.DEVELOPER_ORGANIZATION_URL_DESC).defaultValue(this.getDeveloperOrganizationUrl()));
+        cliOptions.add(new CliOption(CodegenConstants.LICENSE_NAME, CodegenConstants.LICENSE_NAME_DESC).defaultValue(this.getLicenseName()));
+        cliOptions.add(new CliOption(CodegenConstants.LICENSE_URL, CodegenConstants.LICENSE_URL_DESC).defaultValue(this.getLicenseUrl()));
+        cliOptions.add(new CliOption(CodegenConstants.SOURCE_FOLDER, CodegenConstants.SOURCE_FOLDER_DESC).defaultValue(this.getSourceFolder()));
+        CliOption buildTool = CliOption.newString(CodegenConstants.BUILD_TOOL, CodegenConstants.BUILD_TOOL_DESC);
+        Map<String, String> buildToolOptions = new LinkedHashMap<>();
+        buildToolOptions.putAll(Map.of(
+            mavenBuildTool, "Use maven",
+            gradleBuildTool, "Use gradle"
+        ));
+        buildTool.setEnum(buildToolOptions);
+        buildTool.setDefault(mavenBuildTool);
+        cliOptions.add(buildTool);
+        cliOptions.add(CliOption.newString(CodegenConstants.PARENT_GROUP_ID, CodegenConstants.PARENT_GROUP_ID_DESC));
+        cliOptions.add(CliOption.newString(CodegenConstants.PARENT_ARTIFACT_ID, CodegenConstants.PARENT_ARTIFACT_ID_DESC));
+        cliOptions.add(CliOption.newString(CodegenConstants.PARENT_VERSION, CodegenConstants.PARENT_VERSION_DESC));
+        CliOption snapShotVersion = CliOption.newString(CodegenConstants.SNAPSHOT_VERSION, CodegenConstants.SNAPSHOT_VERSION_DESC);
+        Map<String, String> snapShotVersionOptions = new HashMap<>();
+        snapShotVersionOptions.put("true", "Use a SnapShot Version");
+        snapShotVersionOptions.put("false", "Use a Release Version");
+        snapShotVersion.setEnum(snapShotVersionOptions);
+        cliOptions.add(snapShotVersion);
+        cliOptions.add(CliOption.newString(TEST_OUTPUT, "Set output folder for models and APIs tests").defaultValue(DEFAULT_TEST_FOLDER));
+
+        requestBodiesIdentifier = "requestbodies";
+        securitySchemesIdentifier = "securityschemes";
+        requestBodyIdentifier = "requestbody";
+        addSchemaImportsFromV3SpecLocations = true;
+        deepestRefSchemaImportNeeded = true;
+        objectIOClassNamePiece = "Map";
+        arrayIOClassNamePiece = "List";
+        arrayObjectInputClassNameSuffix = "Builder";
+
+        invokerPackage = "org.openapijsonschematools.client";
+        modelPackage = "components.schemas";
+
+        // cliOptions default redefinition need to be updated
+        updateOption(CodegenConstants.INVOKER_PACKAGE, this.getInvokerPackage());
+
+        jsonPathTestTemplateFiles.put(
+            CodegenConstants.JSON_PATH_LOCATION_TYPE.SCHEMA,
+            new HashMap<>() {{
+                put("src/test/java/packagename/components/schemas/Schema_test.hbs", ".java");
+            }}
+        );
+    }
 
     private final Logger LOGGER = LoggerFactory.getLogger(JavaClientGenerator.class);
 
@@ -91,7 +186,6 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
 
     protected String invokerPackage = "org.openapijsonschematools";
     protected String groupId = "org.openapijsonschematools";
-    protected String artifactId = "openapi-java";
     protected String artifactVersion = null;
     protected String artifactUrl = "https://github.com/openapi-json-schema-tools/openapi-json-schema-generator";
     protected String artifactDescription = "OpenAPI Java";
@@ -115,296 +209,128 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
     protected String outputTestFolder = "";
     private final Map<String, String> schemaKeyToModelNameCache = new HashMap<>();
 
-    protected Stability getStability() {
-        return Stability.EXPERIMENTAL;
-    }
-
-    @Override
-    public String toModuleFilename(String name, String jsonPath) {
-        String usedName = sanitizeName(name, "[^a-zA-Z0-9]+");
-        // todo check if empty and if so them use enum name
-        // todo fix this, this does not handle names starting with numbers
-        usedName = usedName.toLowerCase(Locale.ROOT);
-        if (usedName.isEmpty()) {
-            usedName = toEnumVarName(name, null).toLowerCase(Locale.ROOT);
-        }
-        return usedName;
-    }
-
-    protected void updateServersFilepath(String[] pathPieces) {
-        if (pathPieces.length == 2) {
-            // #/servers
-            pathPieces[1] = "RootServerInfo";
-        } else if (pathPieces.length == 3) {
-            // #/servers/0
-            String jsonPath = "#/servers/" + pathPieces[2];
-            pathPieces[2] = toServerFilename(pathPieces[2], jsonPath);
-        } else {
-            // #/servers/0/variables
-            pathPieces[2] = toServerFilename(pathPieces[2], null).toLowerCase(Locale.ROOT);
-            pathPieces[3] = "Variables";
-        }
-    }
-
-    @Override
-    public String getPascalCaseServer(String basename, String jsonPath) {
-        if (jsonPath != null) {
-            String[] pathPieces = jsonPath.split("/");
-            if (jsonPath.startsWith("#/servers")) {
-                if (pathPieces.length == 2) {
-                    // #/servers
-                    return "RootServerInfo";
-                } else {
-                    // #/servers/0
-                    return "Server"+pathPieces[2];
-                }
-            } else if (jsonPath.startsWith("#/paths") && pathPieces.length >= 4 && pathPieces[3].equals("servers")) {
-                CodegenKey pathKey = getKey(ModelUtils.decodeSlashes(pathPieces[2]), "paths", jsonPath);
-                if (pathPieces.length == 4) {
-                    // #/paths/somePath/servers
-                    return pathKey.pascalCase + "ServerInfo";
-                } else {
-                    // #/paths/somePath/servers/0
-                    return pathKey.pascalCase + "Server"+ pathPieces[4];
-                }
-            } else if (jsonPath.startsWith("#/paths") && pathPieces.length >= 5 && pathPieces[4].equals("servers")) {
-                CodegenKey pathKey = getKey(ModelUtils.decodeSlashes(pathPieces[2]), "paths", jsonPath);
-                if (pathPieces.length == 5) {
-                    // #/paths/somePath/get/servers
-                    return pathKey.pascalCase + StringUtils.capitalize(pathPieces[3]) + "ServerInfo";
-                } else {
-                    // #/paths/somePath/get/servers/0
-                    return pathKey.pascalCase + StringUtils.capitalize(pathPieces[3]) + "Server" + pathPieces[5];
-                }
-            }
-        }
-        return "Server" + basename;
-    }
-
-    @Override
-    public String toServerFilename(String basename, String jsonPath) {
-        return getPascalCaseServer(basename, jsonPath);
-    }
-
-    @Override
-    public String generatorLanguageVersion() {
-        return "17";
-    }
-
-    public JavaClientGenerator() {
-        super();
-        headersSchemaFragment = "HeadersSchema";
-
-        supportsInheritance = true;
-
-        hideGenerationTimestamp = false;
-
-        setReservedWordsLowerCase(
-                Arrays.asList(
-                        // used as internal variables, can collide with parameter names
-                        "localVarPath", "localVarQueryParams", "localVarCollectionQueryParams",
-                        "localVarHeaderParams", "localVarCookieParams", "localVarFormParams", "localVarPostBody",
-                        "localVarAccepts", "localVarAccept", "localVarContentTypes",
-                        "localVarContentType", "localVarAuthNames", "localReturnType",
-                        "ApiClient", "ApiException", "ApiResponse", "Configuration", "StringUtil",
-
-                        // language reserved words
-                        "abstract", "continue", "for", "new", "switch", "assert",
-                        "default", "if", "package", "synchronized", "boolean", "do", "goto", "private",
-                        "this", "break", "double", "implements", "protected", "throw", "byte", "else",
-                        "import", "public", "throws", "case", "enum", "instanceof", "return", "transient",
-                        "catch", "extends", "int", "short", "try", "char", "final", "interface", "static",
-                        "void", "class", "finally", "long", "strictfp", "volatile", "const", "float",
-                        "native", "super", "while", "null",
-                        // additional types
-                        "localdate", "zoneddatetime", "list", "map", "linkedhashset", "void", "string", "uuid", "number", "integer", "toString"
-                )
-        );
-
-        languageSpecificPrimitives = Sets.newHashSet("String",
-                "boolean",
-                "Boolean",
-                "Double",
-                "Integer",
-                "Long",
-                "Float",
-                "Object",
-                "byte[]"
-        );
-        typeMapping.put("date", "Date");
-        typeMapping.put("file", "File");
-        typeMapping.put("AnyType", "Object");
-
-        cliOptions.add(new CliOption(CodegenConstants.API_PACKAGE, CodegenConstants.API_PACKAGE_DESC));
-        cliOptions.add(new CliOption(CodegenConstants.INVOKER_PACKAGE, CodegenConstants.INVOKER_PACKAGE_DESC).defaultValue(this.getInvokerPackage()));
-        cliOptions.add(new CliOption(CodegenConstants.GROUP_ID, CodegenConstants.GROUP_ID_DESC).defaultValue(this.getGroupId()));
-        cliOptions.add(new CliOption(CodegenConstants.ARTIFACT_ID, CodegenConstants.ARTIFACT_ID_DESC).defaultValue(this.getArtifactId()));
-        cliOptions.add(new CliOption(CodegenConstants.ARTIFACT_VERSION, CodegenConstants.ARTIFACT_VERSION_DESC).defaultValue(ARTIFACT_VERSION_DEFAULT_VALUE));
-        cliOptions.add(new CliOption(CodegenConstants.ARTIFACT_URL, CodegenConstants.ARTIFACT_URL_DESC).defaultValue(this.getArtifactUrl()));
-        cliOptions.add(new CliOption(CodegenConstants.ARTIFACT_DESCRIPTION, CodegenConstants.ARTIFACT_DESCRIPTION_DESC).defaultValue(this.getArtifactDescription()));
-        cliOptions.add(new CliOption(CodegenConstants.SCM_CONNECTION, CodegenConstants.SCM_CONNECTION_DESC).defaultValue(this.getScmConnection()));
-        cliOptions.add(new CliOption(CodegenConstants.SCM_DEVELOPER_CONNECTION, CodegenConstants.SCM_DEVELOPER_CONNECTION_DESC).defaultValue(this.getScmDeveloperConnection()));
-        cliOptions.add(new CliOption(CodegenConstants.SCM_URL, CodegenConstants.SCM_URL_DESC).defaultValue(this.getScmUrl()));
-        cliOptions.add(new CliOption(CodegenConstants.DEVELOPER_NAME, CodegenConstants.DEVELOPER_NAME_DESC).defaultValue(this.getDeveloperName()));
-        cliOptions.add(new CliOption(CodegenConstants.DEVELOPER_EMAIL, CodegenConstants.DEVELOPER_EMAIL_DESC).defaultValue(this.getDeveloperEmail()));
-        cliOptions.add(new CliOption(CodegenConstants.DEVELOPER_ORGANIZATION, CodegenConstants.DEVELOPER_ORGANIZATION_DESC).defaultValue(this.getDeveloperOrganization()));
-        cliOptions.add(new CliOption(CodegenConstants.DEVELOPER_ORGANIZATION_URL, CodegenConstants.DEVELOPER_ORGANIZATION_URL_DESC).defaultValue(this.getDeveloperOrganizationUrl()));
-        cliOptions.add(new CliOption(CodegenConstants.LICENSE_NAME, CodegenConstants.LICENSE_NAME_DESC).defaultValue(this.getLicenseName()));
-        cliOptions.add(new CliOption(CodegenConstants.LICENSE_URL, CodegenConstants.LICENSE_URL_DESC).defaultValue(this.getLicenseUrl()));
-        cliOptions.add(new CliOption(CodegenConstants.SOURCE_FOLDER, CodegenConstants.SOURCE_FOLDER_DESC).defaultValue(this.getSourceFolder()));
-        cliOptions.add(CliOption.newBoolean(CodegenConstants.HIDE_GENERATION_TIMESTAMP, CodegenConstants.HIDE_GENERATION_TIMESTAMP_DESC, this.isHideGenerationTimestamp()));
-
-        cliOptions.add(CliOption.newString(CodegenConstants.PARENT_GROUP_ID, CodegenConstants.PARENT_GROUP_ID_DESC));
-        cliOptions.add(CliOption.newString(CodegenConstants.PARENT_ARTIFACT_ID, CodegenConstants.PARENT_ARTIFACT_ID_DESC));
-        cliOptions.add(CliOption.newString(CodegenConstants.PARENT_VERSION, CodegenConstants.PARENT_VERSION_DESC));
-        CliOption snapShotVersion = CliOption.newString(CodegenConstants.SNAPSHOT_VERSION, CodegenConstants.SNAPSHOT_VERSION_DESC);
-        Map<String, String> snapShotVersionOptions = new HashMap<>();
-        snapShotVersionOptions.put("true", "Use a SnapShot Version");
-        snapShotVersionOptions.put("false", "Use a Release Version");
-        snapShotVersion.setEnum(snapShotVersionOptions);
-        cliOptions.add(snapShotVersion);
-        cliOptions.add(CliOption.newString(TEST_OUTPUT, "Set output folder for models and APIs tests").defaultValue(DEFAULT_TEST_FOLDER));
-
-        requestBodiesIdentifier = "requestbodies";
-        securitySchemesIdentifier = "securityschemes";
-        requestBodyIdentifier = "requestbody";
-        packageName = "org.openapijsonschematools.client";
-        addSchemaImportsFromV3SpecLocations = true;
-        deepestRefSchemaImportNeeded = true;
-        objectIOClassNamePiece = "Map";
-        arrayIOClassNamePiece = "List";
-        arrayObjectInputClassNameSuffix = "Builder";
-
-        // this tells users what openapi types turn in to
-        instantiationTypes.put("object", "FrozenMap");
-        instantiationTypes.put("array", "FrozenList");
-        instantiationTypes.put("string", "String");
-        instantiationTypes.put("number", "Number (int, long, float, double)");
-        instantiationTypes.put("integer", "Number (int, long, float with integer values, double with integer values)");
-        instantiationTypes.put("boolean", "boolean");
-        instantiationTypes.put("null", "Void (null)");
-
-        modifyFeatureSet(features -> features
-                .includeDocumentationFeatures(
-                        DocumentationFeature.Readme,
-                        DocumentationFeature.Servers,
-                        DocumentationFeature.ComponentSchemas,
-                        DocumentationFeature.ComponentSecuritySchemes,
-                        DocumentationFeature.ComponentRequestBodies,
-                        DocumentationFeature.ComponentResponses,
-                        DocumentationFeature.ComponentHeaders,
-                        DocumentationFeature.ComponentParameters
-                )
-                .includeGlobalFeatures(
-                        GlobalFeature.Components,
-                        GlobalFeature.Servers,
-                        GlobalFeature.Security
-                )
-                .includeComponentsFeatures(
-                        ComponentsFeature.schemas,
-                        ComponentsFeature.securitySchemes,
-                        ComponentsFeature.requestBodies,
-                        ComponentsFeature.responses,
-                        ComponentsFeature.headers,
-                        ComponentsFeature.parameters
-                )
-                .includeSecurityFeatures(
-                        SecurityFeature.ApiKey,
-                        SecurityFeature.HTTP_Basic,
-                        SecurityFeature.HTTP_Bearer
-                )
-                .includeOperationFeatures(
-                        OperationFeature.Security,
-                        OperationFeature.Servers,
-                        OperationFeature.Responses_Default,
-                        OperationFeature.Responses_HttpStatusCode,
-                        OperationFeature.Responses_RangedResponseCodes,
-                        OperationFeature.Responses_RedirectionResponse
-                )
-                .includeSchemaFeatures(
-                        SchemaFeature.AdditionalProperties,
-                        SchemaFeature.AllOf,
-                        SchemaFeature.AnyOf,
-                        SchemaFeature.Const,
-                        SchemaFeature.Contains,
-                        SchemaFeature.Default,
-                        SchemaFeature.DependentRequired,
-                        SchemaFeature.DependentSchemas,
-                        // SchemaFeature.Discriminator,
-                        SchemaFeature.Else,
-                        SchemaFeature.Enum,
-                        SchemaFeature.ExclusiveMaximum,
-                        SchemaFeature.ExclusiveMinimum,
-                        SchemaFeature.Format,
-                        SchemaFeature.If,
-                        SchemaFeature.Items,
-                        SchemaFeature.MaxContains,
-                        SchemaFeature.MaxItems,
-                        SchemaFeature.MaxLength,
-                        SchemaFeature.MaxProperties,
-                        SchemaFeature.Maximum,
-                        SchemaFeature.MinContains,
-                        SchemaFeature.MinItems,
-                        SchemaFeature.MinLength,
-                        SchemaFeature.MinProperties,
-                        SchemaFeature.Minimum,
-                        SchemaFeature.MultipleOf,
-                        SchemaFeature.Not,
-                        SchemaFeature.Nullable,
-                        SchemaFeature.OneOf,
-                        SchemaFeature.Pattern,
-                        SchemaFeature.PatternProperties,
-                        SchemaFeature.PrefixItems,
-                        SchemaFeature.Properties,
-                        SchemaFeature.PropertyNames,
-                        SchemaFeature.Ref,
-                        SchemaFeature.Required,
-                        SchemaFeature.Then,
-                        SchemaFeature.Type,
-                        SchemaFeature.UnevaluatedItems,
-                        SchemaFeature.UnevaluatedProperties,
-                        SchemaFeature.UniqueItems
-                )
-        );
-
-        outputFolder = "generated-code" + File.separator + "java";
-        embeddedTemplateDir = templateDir = "java";
-        invokerPackage = "org.openapijsonschematools.client";
-        artifactId = "openapi-java-client";
-        apiPackage = "apis";
-        modelPackage = "components.schemas";
-
-        // cliOptions default redefinition need to be updated
-        updateOption(CodegenConstants.INVOKER_PACKAGE, this.getInvokerPackage());
-        updateOption(CodegenConstants.ARTIFACT_ID, this.getArtifactId());
-        updateOption(CodegenConstants.API_PACKAGE, apiPackage);
-
-        jsonPathTestTemplateFiles.put(
-                CodegenConstants.JSON_PATH_LOCATION_TYPE.SCHEMA,
-                new HashMap<>() {{
-                    put("src/test/java/packagename/components/schemas/Schema_test.hbs", ".java");
-                }}
-        );
-    }
-
-    @Override
-    public GeneratorType getTag() {
-        return GeneratorType.CLIENT;
-    }
-
-    @Override
-    public String getName() {
-        return "java";
-    }
-
-    @Override
-    public String getHelp() {
-        return String.join("<br />",
-            "Generates a Java client library",
+    private static final FeatureSet featureSet = FeatureSet.newBuilder()
+        .includeDataTypeFeatures(
+            DataTypeFeature.Int32,
+            DataTypeFeature.Int64,
+            DataTypeFeature.Integer,
+            DataTypeFeature.Float,
+            DataTypeFeature.Double,
+            DataTypeFeature.Number,
+            DataTypeFeature.String,
+            DataTypeFeature.Boolean,
+            DataTypeFeature.Date,
+            DataTypeFeature.DateTime,
+            DataTypeFeature.Uuid,
+            DataTypeFeature.Array,
+            DataTypeFeature.Object,
+            DataTypeFeature.Null,
+            DataTypeFeature.AnyType,
+            DataTypeFeature.Enum
+        )
+        .includeDocumentationFeatures(
+            DocumentationFeature.Readme,
+            DocumentationFeature.Servers,
+            DocumentationFeature.Security,
+            DocumentationFeature.ComponentSchemas,
+            DocumentationFeature.ComponentSecuritySchemes,
+            DocumentationFeature.ComponentRequestBodies,
+            DocumentationFeature.ComponentResponses,
+            DocumentationFeature.ComponentHeaders,
+            DocumentationFeature.ComponentParameters,
+            DocumentationFeature.Api
+        )
+        .includeGlobalFeatures(
+            GlobalFeature.Components,
+            GlobalFeature.Servers,
+            GlobalFeature.Security,
+            GlobalFeature.Paths,
+            GlobalFeature.Info
+        )
+        .includeComponentsFeatures(
+            ComponentsFeature.schemas,
+            ComponentsFeature.securitySchemes,
+            ComponentsFeature.requestBodies,
+            ComponentsFeature.responses,
+            ComponentsFeature.headers,
+            ComponentsFeature.parameters
+        )
+        .includeSecurityFeatures(
+            SecurityFeature.ApiKey,
+            SecurityFeature.HTTP_Basic,
+            SecurityFeature.HTTP_Bearer
+        )
+        .includeOperationFeatures(
+            OperationFeature.Security,
+            OperationFeature.Servers,
+            OperationFeature.Responses_Default,
+            OperationFeature.Responses_HttpStatusCode,
+            OperationFeature.Responses_RangedResponseCodes,
+            OperationFeature.Responses_RedirectionResponse
+        )
+        .includeSchemaFeatures(
+            SchemaFeature.AdditionalProperties,
+            SchemaFeature.AllOf,
+            SchemaFeature.AnyOf,
+            SchemaFeature.Const,
+            SchemaFeature.Contains,
+            SchemaFeature.Default,
+            SchemaFeature.DependentRequired,
+            SchemaFeature.DependentSchemas,
+            // SchemaFeature.Discriminator,
+            SchemaFeature.Else,
+            SchemaFeature.Enum,
+            SchemaFeature.ExclusiveMaximum,
+            SchemaFeature.ExclusiveMinimum,
+            SchemaFeature.Format,
+            SchemaFeature.If,
+            SchemaFeature.Items,
+            SchemaFeature.MaxContains,
+            SchemaFeature.MaxItems,
+            SchemaFeature.MaxLength,
+            SchemaFeature.MaxProperties,
+            SchemaFeature.Maximum,
+            SchemaFeature.MinContains,
+            SchemaFeature.MinItems,
+            SchemaFeature.MinLength,
+            SchemaFeature.MinProperties,
+            SchemaFeature.Minimum,
+            SchemaFeature.MultipleOf,
+            SchemaFeature.Not,
+            SchemaFeature.Nullable,
+            SchemaFeature.OneOf,
+            SchemaFeature.Pattern,
+            SchemaFeature.PatternProperties,
+            SchemaFeature.PrefixItems,
+            SchemaFeature.Properties,
+            SchemaFeature.PropertyNames,
+            SchemaFeature.Ref,
+            SchemaFeature.Required,
+            SchemaFeature.Then,
+            SchemaFeature.Type,
+            SchemaFeature.UnevaluatedItems,
+            SchemaFeature.UnevaluatedProperties,
+            SchemaFeature.UniqueItems
+        )
+        .includeWireFormatFeatures(
+            WireFormatFeature.JSON
+        )
+        .build();
+    public static final GeneratorMetadata generatorMetadata = GeneratorMetadata.newBuilder()
+        .name("java")
+        .language(GeneratorLanguage.JAVA)
+        .languageVersion("17")
+        .type(GeneratorType.CLIENT)
+        .stability(Stability.STABLE)
+        .featureSet(featureSet)
+        .generationMessage(String.format(Locale.ROOT, "OpenAPI JSON Schema Generator: %s (%s)", "java", GeneratorType.CLIENT))
+        .helpMsg(String.join(
+            "<br />",
+        "Generates a Java client library",
             "",
             "Features in this generator:",
-            "- v3.0.0 - [v3.0.3](#schema-feature) OpenAPI Specification support for component schemas",
-            "- Very [thorough documentation generated in the style of javadocs, includes code samples](samples/client/petstore/java/docs/components/schemas/Money.md#money)",
+            "- v3.0.0 - [v3.1.0](#schema-feature) OpenAPI Specification support",
+            "- Very thorough documentation generated in the style of javadocs",
             "- Input types constrained for a Schema in SomeSchema.validate",
             "  - validate method can accept arbitrary List/Map/null/int/long/double/float/String json data",
             "- Immutable List output classes generated and returned by validate for List&lt;?&gt; input",
@@ -428,18 +354,100 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
             "- Generated interfaces are largely consistent with the python code",
             "- Openapi spec inline schemas supported at any depth in any location",
             "- Format support for: int32, int64, float, double, date, datetime, uuid",
-            "- Payload values are not coerced when validated, so a datetime value can pass other validations that describe the payload only as type string",
-            "- types are generated for enums of type string/integer/boolean using typing.Literal",
+            "- Payload values are not coerced when validated, so a date/date-time value can pass other validations that describe the payload only as type string",
+            "- enum types are generated for enums of type string/integer/number/boolean/null",
             "- String transmission of numbers supported with type: string, format: number"
-        );
+        ))
+        .postGenerationMsg(defaultPostGenerationMsg)
+        .reservedWords(
+            getLowerCaseWords(
+                Arrays.asList(
+                    // used as internal variables, can collide with parameter names
+                    "localVarPath", "localVarQueryParams", "localVarCollectionQueryParams",
+                    "localVarHeaderParams", "localVarCookieParams", "localVarFormParams", "localVarPostBody",
+                    "localVarAccepts", "localVarAccept", "localVarContentTypes",
+                    "localVarContentType", "localVarAuthNames", "localReturnType",
+                    "ApiClient", "ApiException", "ApiResponse", "Configuration", "StringUtil",
+
+                    // language reserved words
+                    "abstract", "continue", "for", "new", "switch", "assert",
+                    "default", "if", "package", "synchronized", "boolean", "do", "goto", "private",
+                    "this", "break", "double", "implements", "protected", "throw", "byte", "else",
+                    "import", "public", "throws", "case", "enum", "instanceof", "return", "transient",
+                    "catch", "extends", "int", "short", "try", "char", "final", "interface", "static",
+                    "void", "class", "finally", "long", "strictfp", "volatile", "const", "float",
+                    "native", "super", "while", "null",
+                    // additional types
+                    "localdate", "zoneddatetime", "list", "map", "linkedhashset", "void", "string", "uuid", "number", "integer", "toString"
+                )
+            )
+        )
+        .instantiationTypes(
+            Map.ofEntries(
+                new AbstractMap.SimpleEntry<>("object", "FrozenMap"),
+                new AbstractMap.SimpleEntry<>("array", "FrozenList"),
+                new AbstractMap.SimpleEntry<>("string", "String"),
+                new AbstractMap.SimpleEntry<>("number", "Number (int, long, float, double)"),
+                new AbstractMap.SimpleEntry<>("integer", "Number (int, long, float with integer values, double with integer values)"),
+                new AbstractMap.SimpleEntry<>("boolean", "boolean"),
+                new AbstractMap.SimpleEntry<>("null", "Void (null)")
+            )
+        )
+        .languageSpecificPrimitives(
+            Sets.newHashSet(
+                "String",
+                "boolean",
+                "Boolean",
+                "Double",
+                "Integer",
+                "Long",
+                "Float",
+                "Object",
+                "byte[]"
+            )
+        )
+    .build();
+
+    @Override
+    public GeneratorMetadata getGeneratorMetadata() {
+        return generatorMetadata;
+    }
+
+    @Override
+    public String toModuleFilename(String name, String jsonPath) {
+        String usedName = sanitizeName(name, "[^a-zA-Z0-9]+");
+        // todo check if empty and if so them use enum name
+        // todo fix this, this does not handle names starting with numbers
+        usedName = usedName.toLowerCase(Locale.ROOT);
+        if (usedName.isEmpty()) {
+            usedName = toEnumVarName(name, null).toLowerCase(Locale.ROOT);
+        }
+        return usedName;
+    }
+
+    protected void updateServersFilepath(String[] pathPieces) {
+        String[] copiedPathPieces = pathPieces.clone();
+        copiedPathPieces[0] = "#";
+        String jsonPath = String.join("/", copiedPathPieces);
+        if (pathPieces.length == 2) {
+            // #/servers
+            pathPieces[1] = "RootServerInfo";
+        } else if (pathPieces.length == 3) {
+            // #/servers/0
+            pathPieces[2] = getFilename(CodegenKeyType.SERVER, pathPieces[2], jsonPath);
+        } else {
+            // #/servers/0/variables
+            pathPieces[2] = getFilename(CodegenKeyType.SERVER, pathPieces[2], jsonPath).toLowerCase(Locale.ROOT);
+            pathPieces[3] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath);
+        }
     }
 
     public String packagePath() {
-        return "src" + File.separatorChar + "main" + File.separatorChar + "java" + File.separatorChar + packageName.replace('.', File.separatorChar);
+        return "src" + File.separatorChar + "main" + File.separatorChar + "java" + File.separatorChar + generatorSettings.packageName.replace('.', File.separatorChar);
     }
 
     protected String testPackagePath() {
-        return "src" + File.separatorChar + "test" + File.separatorChar + "java" + File.separatorChar + packageName.replace('.', File.separatorChar);
+        return "src" + File.separatorChar + "test" + File.separatorChar + "java" + File.separatorChar + generatorSettings.packageName.replace('.', File.separatorChar);
     }
 
     @Override
@@ -463,7 +471,7 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
         }
 
         if (!additionalProperties.containsKey(CodegenConstants.API_PACKAGE)) {
-            additionalProperties.put(CodegenConstants.API_PACKAGE, apiPackage);
+            additionalProperties.put(CodegenConstants.API_PACKAGE, generatorSettings().apiPackage);
         }
 
         if (additionalProperties.containsKey(CodegenConstants.GROUP_ID)) {
@@ -471,13 +479,6 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
         } else {
             //not set, use to be passed to template
             additionalProperties.put(CodegenConstants.GROUP_ID, groupId);
-        }
-
-        if (additionalProperties.containsKey(CodegenConstants.ARTIFACT_ID)) {
-            this.setArtifactId((String) additionalProperties.get(CodegenConstants.ARTIFACT_ID));
-        } else {
-            //not set, use to be passed to template
-            additionalProperties.put(CodegenConstants.ARTIFACT_ID, artifactId);
         }
 
         if (additionalProperties.containsKey(CodegenConstants.ARTIFACT_URL)) {
@@ -577,7 +578,7 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
             setOutputTestFolder(additionalProperties.get(TEST_OUTPUT).toString());
         }
 
-        additionalProperties.put(CodegenConstants.PACKAGE_NAME, packageName);
+        additionalProperties.put(CodegenConstants.PACKAGE_NAME, generatorSettings.packageName);
         List<String> schemaSupportingFiles = new ArrayList<>();
         schemaSupportingFiles.add("AnyTypeJsonSchema");
         schemaSupportingFiles.add("BooleanJsonSchema");
@@ -729,7 +730,7 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
         exceptionClasses.add("ApiException");
         exceptionClasses.add("BaseException");
         exceptionClasses.add("InvalidAdditionalPropertyException");
-        exceptionClasses.add("InvalidTypeException");
+        exceptionClasses.add("NotImplementedException");
         exceptionClasses.add("UnsetPropertyException");
         exceptionClasses.add("ValidationException");
         for (String exceptionClass: exceptionClasses) {
@@ -1033,6 +1034,31 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
                 put("src/main/java/packagename/paths/path/PathItem.hbs", ".java");
             }}
         );
+        // apis
+        jsonPathTemplateFiles.put(
+            CodegenConstants.JSON_PATH_LOCATION_TYPE.API_PATH,
+            new HashMap<>() {{
+                put("src/main/java/packagename/apis/paths/Api.hbs", ".java");
+            }}
+        );
+        jsonPathDocTemplateFiles.put(
+            CodegenConstants.JSON_PATH_LOCATION_TYPE.API_PATH,
+            new HashMap<>() {{
+                put("src/main/java/packagename/apis/paths/ApiDoc.hbs", ".md");
+            }}
+        );
+        jsonPathTemplateFiles.put(
+            CodegenConstants.JSON_PATH_LOCATION_TYPE.API_TAG,
+            new HashMap<>() {{
+                put("src/main/java/packagename/apis/tags/Api.hbs", ".java");
+            }}
+        );
+        jsonPathDocTemplateFiles.put(
+            CodegenConstants.JSON_PATH_LOCATION_TYPE.API_TAG,
+            new HashMap<>() {{
+                put("src/main/java/packagename/apis/tags/ApiDoc.hbs", ".md");
+            }}
+        );
 
         // schema
         HashMap<String, String> schemaTemplates = new HashMap<>();
@@ -1051,10 +1077,6 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
         super.processOpts();
 
         authFolder = (sourceFolder + '/' + invokerPackage + ".auth").replace(".", "/");
-
-        //Common files
-        supportingFiles.add(new SupportingFile("pom.hbs", "", "pom.xml").doNotOverwrite());
-        supportingFiles.add(new SupportingFile("README.hbs", "", "README.md").doNotOverwrite());
     }
 
     @Override
@@ -1071,7 +1093,7 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
     @Override
     public String toApiVarName(String name) {
         String apiVarName = super.toApiVarName(name);
-        if (reservedWords.contains(apiVarName)) {
+        if (getGeneratorMetadata().getReservedWords().contains(apiVarName)) {
             apiVarName = escapeReservedWord(apiVarName);
         }
         return apiVarName;
@@ -1092,96 +1114,8 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
     }
 
     @Override
-    public String toContentTypeFilename(String name) {
-        return toModuleFilename(name, null);
-    }
-
-    @Override
     public String toModelFilename(String name, String jsonPath) {
         return toModelName(name, jsonPath);
-    }
-
-    @Override
-    public String toSecuritySchemeFilename(String basename, String jsonPath) {
-        return toModelName(basename, jsonPath);
-    }
-
-    @Override
-    public String toRequestBodyFilename(String componentName, String jsonPath) {
-        String[] pathPieces = jsonPath.split("/");
-        if (pathPieces[2].equals("requestbodies") || pathPieces[2].equals("requestBodies")) {
-            if (pathPieces.length == 4) {
-                // #/components/requestBodies/Pet
-                return toModelName( componentName, null);
-            }
-            return toModuleFilename(componentName, null);
-        }
-        if (pathPieces.length == 5) {
-            // #/paths/somePath/verb/requestBody
-            return toModelName(componentName, null);
-        }
-        return toModuleFilename(componentName, null);
-    }
-
-    public String toHeaderFilename(String componentName, String jsonPath) {
-        String[] pathPieces = jsonPath.split("/");
-        if (jsonPath.startsWith("#/components/headers/")) {
-            if (pathPieces.length == 4) {
-                // #/components/headers/SomeHeader
-                return toModelName(componentName, null);
-            }
-            // deeper paths
-            return toModuleFilename(componentName, jsonPath);
-        } else if (jsonPath.startsWith("#/components/responses/")) {
-            if (pathPieces.length == 5) {
-                // #/components/responses/SomeResponse/headers
-                return "Headers";
-            } else if (pathPieces.length == 6) {
-                // #/components/responses/SomeResponse/headers/SomeHeader
-                return toModelName(componentName, null);
-            }
-            // deeper paths
-            return toModuleFilename(componentName, jsonPath);
-        }
-        if (pathPieces.length == 7) {
-            // #/paths/somePath/verb/responses/200/headers
-            return "Headers";
-        } else if (pathPieces.length == 8) {
-            // #/paths/somePath/verb/responses/200/headers/SomeHeader
-            return toModelName(componentName, null);
-        }
-        // deeper paths
-        return toModuleFilename(componentName, jsonPath);
-    }
-
-    public String getPascalCaseResponse(String componentName, String jsonPath) {
-        if (jsonPath.startsWith("#/components/responses/")) {
-            return toModelName(componentName, null);
-        } else {
-            return toModelName("Code"+componentName+"Response", null);
-        }
-    }
-
-    @Override
-    public String toResponseModuleName(String componentName, String jsonPath) {
-        String[] pathPieces = jsonPath.split("/");
-        if (jsonPath.startsWith("#/components/responses/")) {
-            if (pathPieces.length == 4) {
-                // #/components/responses/SomeResponse
-                return toModelName(componentName, null);
-            }
-            return toModuleFilename(componentName, jsonPath);
-        }
-        switch (pathPieces.length) {
-            case 5:
-                // #/paths/somePath/verb/responses
-                return "Responses";
-            case 6:
-                // #/paths/somePath/verb/responses/200
-                return toModelName("Code"+componentName+"Response", null);
-            default:
-                return toModuleFilename("code"+componentName+"response", null);
-        }
     }
 
     @Override
@@ -1196,11 +1130,6 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
             return false;
         }
         return name.matches("^[a-zA-Z]\\w*$");
-    }
-
-    @Override
-    public String getSchemaPascalCaseName(String name, @NotNull String sourceJsonPath) {
-        return getSchemaPascalCaseName(name, sourceJsonPath, true);
     }
 
     protected String getCamelCaseName(String key) {
@@ -1265,6 +1194,11 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
         - so all header schemas must be named by their header name to prevent collisions
          */
         String[] pathPieces = sourceJsonPath.split("/");
+
+
+        String lastFragment = pathPieces[pathPieces.length-1];
+        boolean operationParametersSchema = (sourceJsonPath.startsWith("#/paths/") && xParameters.contains(lastFragment) && xParameters.contains(name));
+        boolean serverVariables = (lastFragment.equals("variables") && Set.of(4,6,7).contains(pathPieces.length) && name.equals("variables"));
         if (sourceJsonPath.endsWith("/schema")) {
             if (sourceJsonPath.startsWith("#/paths") && sourceJsonPath.contains("/parameters/")) {
                 if (pathPieces[3].equals("parameters")) {
@@ -1286,7 +1220,7 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
                 } else if (sourceJsonPath.startsWith("#/components/responses/") && sourceJsonPath.contains("/headers/")) {
                     // #/components/responses/SomeResponse/headers/someHeader/schema
                     String headerFragment = pathPieces[5];
-                    usedKey =  camelize(headerFragment)+ camelize(usedKey);
+                    usedKey =  camelize(headerFragment) + camelize(usedKey);
                 } else {
                     // #/paths/path/verb/responses/SomeResponse/headers/someHeader/schema
                     String headerFragment = pathPieces[7];
@@ -1305,10 +1239,25 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
             // #/paths/path/verb/responses/200/HeadersSchema
             String responseJsonPath = String.join("/", Arrays.copyOfRange(pathPieces, 0, pathPieces.length-1));
             String responseFragment = pathPieces[pathPieces.length-2];
-            String pascalCaseResponse = getPascalCaseResponse(responseFragment, responseJsonPath);
+            String pascalCaseResponse = getPascalCase(CodegenKeyType.RESPONSE, responseFragment, responseJsonPath);
             usedKey =  pascalCaseResponse + camelize(usedKey);
+        } else if (operationParametersSchema) {
+            String prefix = getPathClassNamePrefix(sourceJsonPath);
+            usedKey = prefix + lastFragment;
+        } else if (serverVariables) {
+            if (pathPieces.length == 4) {
+                // #/servers/0/variables -> 4
+                usedKey = "RootServer" + pathPieces[2] + "Variables";
+            } else if (pathPieces.length == 6) {
+                // #/paths/somePath/servers/0/variables -> 6
+                CodegenKey pathKey = getKey(ModelUtils.decodeSlashes(pathPieces[2]), "paths", sourceJsonPath);
+                usedKey = pathKey.pascalCase + "Server" + pathPieces[4] + "Variables";
+            } else {
+                // #/paths/somePath/get/servers/0/variables -> 7
+                String prefix = getPathClassNamePrefix(sourceJsonPath);
+                usedKey = prefix + "Server" + pathPieces[5] + "Variables";
+            }
         }
-
         HashMap<String, Integer> keyToQty = sourceJsonPathToKeyToQty.getOrDefault(sourceJsonPath, new HashMap<>());
         if (useCache) {
             if (!sourceJsonPathToKeyToQty.containsKey(sourceJsonPath)) {
@@ -1352,16 +1301,6 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
         return usedKey;
     }
 
-    @Override
-    public String getSchemaFilename(String jsonPath) {
-        String modelName = schemaJsonPathToModelName.get(jsonPath);
-        if (modelName == null) {
-            String[] pathPieces = jsonPath.split("/");
-            return getSchemaPascalCaseName(pathPieces[pathPieces.length-1], jsonPath, false);
-        }
-        return modelName;
-    }
-
     protected CodegenKey getContainerJsonPathPiece(String expectedComponentType, String currentJsonPath, String sourceJsonPath) {
         return getJsonPathPiece(expectedComponentType, currentJsonPath, sourceJsonPath);
     }
@@ -1390,60 +1329,13 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
         return true;
     }
 
-    @Override
-    public String getPascalCaseParameter(String basename, String jsonPath) {
-
-        return toParameterFilename(basename, jsonPath);
-
-    }
-
-    public String toPathFilename(String name, String jsonPath) {
-        String[] pathPieces = jsonPath.split("/");
-        if (pathPieces.length == 3) {
-            // #/paths/somePath -> Somepath
-            String moduleFilename = toModuleFilename(name, jsonPath);
-            return camelize(moduleFilename, false);
-        }
-        // #/paths/somePath/blah -> somepath
-        return toModuleFilename(name, jsonPath);
-    }
-
-    @Override
-    public String toParameterFilename(String name, String jsonPath) {
-        // adds prefix parameter_ onto the result so modules do not start with _
-        String[] pathPieces = jsonPath.split("/");
-        if (jsonPath.startsWith("#/components/parameters/")) {
-            if (pathPieces.length == 4) {
-                // #/components/parameters/SomeParameter
-                return toModelName(name, null);
-            }
-            return toModuleFilename(name, jsonPath);
-        }
-        if (operationVerbs.contains(pathPieces[3])) {
-            if (pathPieces.length == 5) {
-                // #/paths/somePath/verb/parameters
-                return "Parameters";
-            }
-            if (pathPieces[pathPieces.length-2].equals("parameters") && isInteger(name) && pathPieces.length == 6) {
-                // #/paths/somePath/verb/parameters/0
-                return "Parameter" + name;
-            }
-            return "parameter" + name;
-        }
-        if (pathPieces[pathPieces.length-2].equals("parameters") && isInteger(name) && pathPieces.length == 5) {
-            // #/paths/somePath/parameters/0
-            return "RouteParameter" + name;
-        }
-        return "routeparameter" + name;
-    }
-
     private String toSchemaRefClass(String ref, String sourceJsonPath) {
         int schemaSuffix = 1;
         String[] refPieces = ref.split("/");
         if (ref.equals(sourceJsonPath)) {
             // self reference, no import needed
             if (ref.startsWith("#/components/schemas/") && refPieces.length == 4) {
-                return getSchemaFilename(ref)+schemaSuffix;
+                return getFilename(CodegenKeyType.SCHEMA, refPieces[refPieces.length-1], ref)+schemaSuffix;
             }
             Set<String> httpMethods = new HashSet<>(Arrays.asList("post", "put", "patch", "get", "delete", "trace", "options"));
             boolean requestBodyCase = (
@@ -1464,13 +1356,13 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
         if (sourceJsonPath != null && ref.startsWith(sourceJsonPath + "/")) {
             // internal in-schema reference, no import needed
             // TODO handle this in the future
-            if (getFilepath(sourceJsonPath).equals(getFilepath(ref))) {
+            if (getFilePath(GeneratedFileType.CODE, sourceJsonPath).equals(getFilePath(GeneratedFileType.CODE, ref))) {
                 // TODO ensure that getFilepath returns the same file for somePath/get/QueryParameters
                 // TODO ensure that getFilepath returns the same file for schemas/SomeSchema...
                 return null;
             }
         }
-        return getSchemaFilename(ref)+schemaSuffix;
+        return getFilename(CodegenKeyType.SCHEMA, refPieces[refPieces.length-1], ref)+schemaSuffix;
     }
 
     private String toRequestBodyRefClass(String ref) {
@@ -1537,8 +1429,8 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
 
     @Override
     public String getRefModuleLocation(String ref) {
-        String filePath = getFilepath(ref);
-        String prefix = outputFolder + File.separatorChar + "src" + File.separatorChar + "main" + File.separatorChar + "java" + File.separatorChar;
+        String filePath = getFilePath(GeneratedFileType.CODE, ref);
+        String prefix = generatorSettings.outputFolder + File.separatorChar + "src" + File.separatorChar + "main" + File.separatorChar + "java" + File.separatorChar;
         // modules are always in a package one above them, so strip off the last jsonPath fragment
         String localFilepath = filePath.substring(prefix.length(), filePath.lastIndexOf(File.separatorChar));
         return localFilepath.replaceAll(String.valueOf(File.separatorChar), ".");
@@ -1576,14 +1468,14 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
         if (schema.types != null) {
             if (schema.types.contains("array")) {
                 imports.add("import java.util.List;");
-                imports.add("import "+packageName + ".schemas.validation.FrozenList;");
+                imports.add("import "+ generatorSettings.packageName + ".schemas.validation.FrozenList;");
                 if (schema.items != null) {
                     imports.addAll(getDeeperImports(sourceJsonPath, schema.items));
                 }
             }
             if (schema.types.contains("object")) {
                 imports.add("import java.util.Map;");
-                imports.add("import "+packageName + ".schemas.validation.FrozenMap;");
+                imports.add("import "+ generatorSettings.packageName + ".schemas.validation.FrozenMap;");
                 if (schema.mapValueSchema != null) {
                     imports.addAll(getDeeperImports(sourceJsonPath, schema.mapValueSchema));
                 }
@@ -1694,7 +1586,7 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
             if (schema.types.size() == 1) {
                 if (schema.types.contains("boolean")) {
                     if (schema.isSimpleBoolean()) {
-                        imports.add("import "+packageName + ".schemas.BooleanJsonSchema;");
+                        imports.add("import "+ generatorSettings.packageName + ".schemas.BooleanJsonSchema;");
                         imports.add("import org.checkerframework.checker.nullness.qual.Nullable;");
                     } else {
                         addCustomSchemaImports(imports, schema);
@@ -1703,7 +1595,7 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
                     }
                 } else if (schema.types.contains("null")) {
                     if (schema.isSimpleNull()) {
-                        imports.add("import "+packageName + ".schemas.NullJsonSchema;");
+                        imports.add("import "+generatorSettings.packageName + ".schemas.NullJsonSchema;");
                         imports.add("import org.checkerframework.checker.nullness.qual.Nullable;");
                     } else {
                         addCustomSchemaImports(imports, schema);
@@ -1714,11 +1606,11 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
                     if (schema.isSimpleInteger()) {
                         imports.add("import org.checkerframework.checker.nullness.qual.Nullable;");
                         if (schema.format == null || schema.format.equals("int")) {
-                            imports.add("import "+packageName + ".schemas.IntJsonSchema;");
+                            imports.add("import "+generatorSettings.packageName + ".schemas.IntJsonSchema;");
                         } else if (schema.format.equals("int32")) {
-                            imports.add("import "+packageName + ".schemas.Int32JsonSchema;");
+                            imports.add("import "+generatorSettings.packageName + ".schemas.Int32JsonSchema;");
                         } else if (schema.format.equals("int64")) {
-                            imports.add("import "+packageName + ".schemas.Int64JsonSchema;");
+                            imports.add("import "+generatorSettings.packageName + ".schemas.Int64JsonSchema;");
                         }
                     } else {
                         addCustomSchemaImports(imports, schema);
@@ -1729,15 +1621,15 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
                     if (schema.isSimpleNumber()) {
                         imports.add("import org.checkerframework.checker.nullness.qual.Nullable;");
                         if (schema.format == null) {
-                            imports.add("import "+packageName + ".schemas.NumberJsonSchema;");
+                            imports.add("import "+generatorSettings.packageName + ".schemas.NumberJsonSchema;");
                         } else if (schema.format.equals("int32")) {
-                            imports.add("import "+packageName + ".schemas.Int32JsonSchema;");
+                            imports.add("import "+generatorSettings.packageName + ".schemas.Int32JsonSchema;");
                         } else if (schema.format.equals("int64")) {
-                            imports.add("import "+packageName + ".schemas.Int64JsonSchema;");
+                            imports.add("import "+generatorSettings.packageName + ".schemas.Int64JsonSchema;");
                         } else if (schema.format.equals("float")) {
-                            imports.add("import "+packageName + ".schemas.FloatJsonSchema;");
+                            imports.add("import "+generatorSettings.packageName + ".schemas.FloatJsonSchema;");
                         } else if (schema.format.equals("double")) {
-                            imports.add("import "+packageName + ".schemas.DoubleJsonSchema;");
+                            imports.add("import "+generatorSettings.packageName + ".schemas.DoubleJsonSchema;");
                         }
                     } else {
                         addCustomSchemaImports(imports, schema);
@@ -1748,21 +1640,21 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
                     if (schema.isSimpleString()) {
                         imports.add("import org.checkerframework.checker.nullness.qual.Nullable;");
                         if (schema.format == null) {
-                            imports.add("import "+packageName + ".schemas.StringJsonSchema;");
+                            imports.add("import "+generatorSettings.packageName + ".schemas.StringJsonSchema;");
                         } else if (schema.format.equals("date")) {
-                            imports.add("import "+packageName + ".schemas.DateJsonSchema;");
+                            imports.add("import "+generatorSettings.packageName + ".schemas.DateJsonSchema;");
                         } else if (schema.format.equals("date-time")) {
-                            imports.add("import "+packageName + ".schemas.DateTimeJsonSchema;");
+                            imports.add("import "+generatorSettings.packageName + ".schemas.DateTimeJsonSchema;");
                         } else if (schema.format.equals("number")) {
-                            imports.add("import "+packageName + ".schemas.DecimalJsonSchema;");
+                            imports.add("import "+generatorSettings.packageName + ".schemas.DecimalJsonSchema;");
                         } else if (schema.format.equals("uuid")) {
-                            imports.add("import "+packageName + ".schemas.UuidJsonSchema;");
+                            imports.add("import "+generatorSettings.packageName + ".schemas.UuidJsonSchema;");
                         } else if (schema.format.equals("byte")) {
                             // todo implement this
-                            imports.add("import "+packageName + ".schemas.StringJsonSchema;");
+                            imports.add("import "+generatorSettings.packageName + ".schemas.StringJsonSchema;");
                         } else if (schema.format.equals("binary")) {
                             // todo implement this
-                            imports.add("import "+packageName + ".schemas.StringJsonSchema;");
+                            imports.add("import "+generatorSettings.packageName + ".schemas.StringJsonSchema;");
                         }
                     } else {
                         addCustomSchemaImports(imports, schema);
@@ -1772,9 +1664,9 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
                 } else if (schema.types.contains("object")) {
                     if (schema.isSimpleObject()) {
                         imports.add("import org.checkerframework.checker.nullness.qual.Nullable;");
-                        imports.add("import "+packageName + ".schemas.MapJsonSchema;");
+                        imports.add("import "+generatorSettings.packageName + ".schemas.MapJsonSchema;");
                         // add this in case the 1 higher schema is an array of FrozenMap
-                        imports.add("import "+packageName + ".schemas.validation.FrozenMap;");
+                        imports.add("import "+generatorSettings.packageName + ".schemas.validation.FrozenMap;");
                     } else {
                         addCustomSchemaImports(imports, schema);
                         imports.add("import java.util.Set;");
@@ -1786,9 +1678,9 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
                 } else if (schema.types.contains("array")) {
                     if (schema.isSimpleArray()) {
                         imports.add("import org.checkerframework.checker.nullness.qual.Nullable;");
-                        imports.add("import "+packageName + ".schemas.ListJsonSchema;");
+                        imports.add("import "+generatorSettings.packageName + ".schemas.ListJsonSchema;");
                         // add this in case the 1 higher schema is a map of FrozenList
-                        imports.add("import "+packageName + ".schemas.validation.FrozenList;");
+                        imports.add("import "+generatorSettings.packageName + ".schemas.validation.FrozenList;");
                     } else {
                         addCustomSchemaImports(imports, schema);
                         imports.add("import java.util.Set;");
@@ -1830,29 +1722,29 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
             // no types
             if (schema.isBooleanSchemaTrue) {
                 imports.add("import org.checkerframework.checker.nullness.qual.Nullable;");
-                imports.add("import "+packageName + ".schemas.AnyTypeJsonSchema;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.AnyTypeJsonSchema;");
             } else if (schema.isBooleanSchemaFalse) {
                 imports.add("import org.checkerframework.checker.nullness.qual.Nullable;");
-                imports.add("import "+packageName + ".schemas.NotAnyTypeJsonSchema;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.NotAnyTypeJsonSchema;");
             } else if (schema.isSimpleAnyType()) {
                 imports.add("import org.checkerframework.checker.nullness.qual.Nullable;");
-                imports.add("import "+packageName + ".schemas.AnyTypeJsonSchema;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.AnyTypeJsonSchema;");
                 // in case higher schema is ListBuilder add List + Map
             } else {
                 addCustomSchemaImports(imports, schema);
                 imports.add("import java.time.LocalDate;");
                 imports.add("import java.time.ZonedDateTime;");
                 imports.add("import java.util.UUID;");
-                imports.add("import "+packageName + ".schemas.validation.FrozenList;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.FrozenList;");
                 imports.add("import java.util.List;");
-                imports.add("import "+packageName + ".schemas.validation.FrozenMap;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.FrozenMap;");
                 imports.add("import java.util.Map;");
-                imports.add("import "+packageName + ".schemas.validation.NullSchemaValidator;");
-                imports.add("import "+packageName + ".schemas.validation.BooleanSchemaValidator;");
-                imports.add("import "+packageName + ".schemas.validation.NumberSchemaValidator;");
-                imports.add("import "+packageName + ".schemas.validation.StringSchemaValidator;");
-                imports.add("import "+packageName + ".schemas.validation.ListSchemaValidator;");
-                imports.add("import "+packageName + ".schemas.validation.MapSchemaValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.NullSchemaValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.BooleanSchemaValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.NumberSchemaValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.StringSchemaValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.ListSchemaValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.MapSchemaValidator;");
                 imports.add("import java.util.LinkedHashMap;");
                 imports.add("import java.util.ArrayList;"); // for validate
                 addPropertiesImports(schema, imports);
@@ -1876,8 +1768,8 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
                     imports.addAll(getDeeperImports(sourceJsonPath, schema.items));
                 }
                 if (schema.additionalProperties == null || !schema.additionalProperties.isBooleanSchemaFalse) {
-                    imports.add("import "+packageName + ".exceptions.UnsetPropertyException;");
-                    imports.add("import "+packageName + ".exceptions.InvalidAdditionalPropertyException;");
+                    imports.add("import "+generatorSettings.packageName + ".exceptions.UnsetPropertyException;");
+                    imports.add("import "+generatorSettings.packageName + ".exceptions.InvalidAdditionalPropertyException;");
                 }
             }
         }
@@ -1892,45 +1784,45 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
 
     private void addDefaultValueImport(CodegenSchema schema, Set<String> imports) {
         if (schema.defaultValue != null) {
-            imports.add("import "+packageName + ".schemas.validation.DefaultValueMethod;");
+            imports.add("import "+generatorSettings.packageName + ".schemas.validation.DefaultValueMethod;");
         }
     }
 
 
     private void addEnumValidator(CodegenSchema schema, Set<String> imports) {
         if (schema.enumInfo != null) {
-            imports.add("import "+packageName + ".schemas.SetMaker;");
+            imports.add("import "+generatorSettings.packageName + ".schemas.SetMaker;");
             if (schema.enumInfo.typeToValues.containsKey("null")) {
-                imports.add("import "+packageName + ".schemas.validation.NullEnumValidator;");
-                imports.add("import "+packageName + ".schemas.validation.NullValueMethod;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.NullEnumValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.NullValueMethod;");
             }
             if (schema.enumInfo.typeToValues.containsKey("boolean")) {
-                imports.add("import "+packageName + ".schemas.validation.BooleanEnumValidator;");
-                imports.add("import "+packageName + ".schemas.validation.BooleanValueMethod;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.BooleanEnumValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.BooleanValueMethod;");
             }
             if (schema.enumInfo.typeToValues.containsKey("string")) {
-                imports.add("import "+packageName + ".schemas.validation.StringEnumValidator;");
-                imports.add("import "+packageName + ".schemas.validation.StringValueMethod;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.StringEnumValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.StringValueMethod;");
             }
             if (schema.enumInfo.typeToValues.containsKey("Integer")) {
                 imports.add("import java.math.BigDecimal;");
-                imports.add("import "+packageName + ".schemas.validation.IntegerEnumValidator;");
-                imports.add("import "+packageName + ".schemas.validation.IntegerValueMethod;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.IntegerEnumValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.IntegerValueMethod;");
             }
             if (schema.enumInfo.typeToValues.containsKey("Long")) {
                 imports.add("import java.math.BigDecimal;");
-                imports.add("import "+packageName + ".schemas.validation.LongEnumValidator;");
-                imports.add("import "+packageName + ".schemas.validation.LongValueMethod;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.LongEnumValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.LongValueMethod;");
             }
             if (schema.enumInfo.typeToValues.containsKey("Float")) {
                 imports.add("import java.math.BigDecimal;");
-                imports.add("import "+packageName + ".schemas.validation.FloatEnumValidator;");
-                imports.add("import "+packageName + ".schemas.validation.FloatValueMethod;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.FloatEnumValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.FloatValueMethod;");
             }
             if (schema.enumInfo.typeToValues.containsKey("Double")) {
                 imports.add("import java.math.BigDecimal;");
-                imports.add("import "+packageName + ".schemas.validation.DoubleEnumValidator;");
-                imports.add("import "+packageName + ".schemas.validation.DoubleValueMethod;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.DoubleEnumValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.DoubleValueMethod;");
             }
         }
     }
@@ -1938,47 +1830,47 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
     private void addConstImports(CodegenSchema schema, Set<String> imports) {
         if (schema.constInfo != null) {
             if (schema.constInfo.typeToValues.containsKey("null")) {
-                imports.add("import "+packageName + ".schemas.validation.NullEnumValidator;");
-                imports.add("import "+packageName + ".schemas.validation.NullValueMethod;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.NullEnumValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.NullValueMethod;");
             }
             if (schema.constInfo.typeToValues.containsKey("boolean")) {
-                imports.add("import "+packageName + ".schemas.validation.BooleanEnumValidator;");
-                imports.add("import "+packageName + ".schemas.validation.BooleanValueMethod;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.BooleanEnumValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.BooleanValueMethod;");
             }
             if (schema.constInfo.typeToValues.containsKey("string")) {
-                imports.add("import "+packageName + ".schemas.validation.StringEnumValidator;");
-                imports.add("import "+packageName + ".schemas.validation.StringValueMethod;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.StringEnumValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.StringValueMethod;");
             }
             if (schema.constInfo.typeToValues.containsKey("Integer")) {
                 imports.add("import java.math.BigDecimal;");
-                imports.add("import "+packageName + ".schemas.validation.IntegerEnumValidator;");
-                imports.add("import "+packageName + ".schemas.validation.IntegerValueMethod;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.IntegerEnumValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.IntegerValueMethod;");
             }
             if (schema.constInfo.typeToValues.containsKey("Long")) {
                 imports.add("import java.math.BigDecimal;");
-                imports.add("import "+packageName + ".schemas.validation.LongEnumValidator;");
-                imports.add("import "+packageName + ".schemas.validation.LongValueMethod;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.LongEnumValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.LongValueMethod;");
             }
             if (schema.constInfo.typeToValues.containsKey("Float")) {
                 imports.add("import java.math.BigDecimal;");
-                imports.add("import "+packageName + ".schemas.validation.FloatEnumValidator;");
-                imports.add("import "+packageName + ".schemas.validation.FloatValueMethod;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.FloatEnumValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.FloatValueMethod;");
             }
             if (schema.constInfo.typeToValues.containsKey("Double")) {
                 imports.add("import java.math.BigDecimal;");
-                imports.add("import "+packageName + ".schemas.validation.DoubleEnumValidator;");
-                imports.add("import "+packageName + ".schemas.validation.DoubleValueMethod;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.DoubleEnumValidator;");
+                imports.add("import "+generatorSettings.packageName + ".schemas.validation.DoubleValueMethod;");
             }
         }
     }
 
     private void addPropertiesImports(CodegenSchema schema, Set<String> imports) {
         if (schema.properties != null) {
-            imports.add("import " + packageName + ".schemas.validation.PropertyEntry;");
+            imports.add("import " + generatorSettings.packageName + ".schemas.validation.PropertyEntry;");
             imports.add("import java.util.Map;");
             imports.add("import java.util.Set;");
-            imports.add("import " + packageName + ".exceptions.UnsetPropertyException;");
-            imports.add("import " + packageName + ".schemas.GenericBuilder;");
+            imports.add("import " + generatorSettings.packageName + ".exceptions.UnsetPropertyException;");
+            imports.add("import " + generatorSettings.packageName + ".schemas.GenericBuilder;");
         }
     }
 
@@ -1992,16 +1884,16 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
 
     private void addDependentSchemasImports(CodegenSchema schema, Set<String> imports) {
         if (schema.dependentSchemas != null) {
-            imports.add("import " + packageName + ".schemas.validation.PropertyEntry;");
+            imports.add("import " + generatorSettings.packageName + ".schemas.validation.PropertyEntry;");
             imports.add("import java.util.Map;");
         }
     }
 
     private void addDependentRequiredImports(CodegenSchema schema, Set<String> imports) {
         if (schema.dependentRequired != null) {
-            imports.add("import "+packageName + ".schemas.validation.MapUtils;");
+            imports.add("import "+generatorSettings.packageName + ".schemas.validation.MapUtils;");
             imports.add("import java.util.AbstractMap;");
-            imports.add("import "+packageName + ".schemas.SetMaker;");
+            imports.add("import "+generatorSettings.packageName + ".schemas.SetMaker;");
         }
     }
 
@@ -2025,14 +1917,14 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
 
     private void addAdditionalPropertiesImports(CodegenSchema schema, Set<String> imports) {
         if (schema.additionalProperties == null || !schema.additionalProperties.isBooleanSchemaFalse) {
-            imports.add("import "+packageName + ".exceptions.UnsetPropertyException;");
-            imports.add("import "+packageName + ".exceptions.InvalidAdditionalPropertyException;");
+            imports.add("import "+generatorSettings.packageName + ".exceptions.UnsetPropertyException;");
+            imports.add("import "+generatorSettings.packageName + ".exceptions.InvalidAdditionalPropertyException;");
         }
         if (schema.additionalProperties != null) {
-            imports.add("import "+packageName + ".schemas.GenericBuilder;");
-            imports.add("import "+packageName + ".schemas.validation.MapUtils;");
+            imports.add("import "+generatorSettings.packageName + ".schemas.GenericBuilder;");
+            imports.add("import "+generatorSettings.packageName + ".schemas.validation.MapUtils;");
         } else {
-            imports.add("import "+packageName + ".schemas.UnsetAddPropsSetter;");
+            imports.add("import "+generatorSettings.packageName + ".schemas.UnsetAddPropsSetter;");
         }
     }
 
@@ -2040,7 +1932,7 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
     private void addRequiredValidator(CodegenSchema schema, Set<String> imports) {
         if (schema.requiredProperties != null) {
             imports.add("import java.util.Set;");
-            imports.add("import "+packageName + ".schemas.GenericBuilder;");
+            imports.add("import "+generatorSettings.packageName + ".schemas.GenericBuilder;");
         }
     }
 
@@ -2051,24 +1943,23 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
     }
 
     private void addCustomSchemaImports(Set<String> imports, CodegenSchema schema) {
-        imports.add("import " + packageName + ".schemas.validation.JsonSchema;");
-        imports.add("import " + packageName + ".schemas.validation.JsonSchemaInfo;");
-        imports.add("import "+packageName + ".configurations.SchemaConfiguration;");
-        imports.add("import "+packageName + ".exceptions.ValidationException;");
-        imports.add("import "+packageName + ".exceptions.InvalidTypeException;"); // for castToAllowedTypes
+        imports.add("import " + generatorSettings.packageName + ".schemas.validation.JsonSchema;");
+        imports.add("import " + generatorSettings.packageName + ".schemas.validation.JsonSchemaInfo;");
+        imports.add("import "+generatorSettings.packageName + ".configurations.SchemaConfiguration;");
+        imports.add("import "+generatorSettings.packageName + ".exceptions.ValidationException;");
         imports.add("import java.util.Set;"); // for validate
         imports.add("import java.util.HashSet;"); // for validate
         imports.add("import java.util.Objects;"); // for validate
         imports.add("import java.util.LinkedHashSet;"); // for validate
         imports.add("import java.util.List;"); // for castToAllowedTypes
-        imports.add("import "+packageName + ".schemas.validation.PathToSchemasMap;"); // for getNewInstance
-        imports.add("import "+packageName + ".schemas.validation.ValidationMetadata;"); // for getNewInstance
-        imports.add("import "+packageName + ".configurations.JsonSchemaKeywordFlags;"); // for getNewInstance
+        imports.add("import "+generatorSettings.packageName + ".schemas.validation.PathToSchemasMap;"); // for getNewInstance
+        imports.add("import "+generatorSettings.packageName + ".schemas.validation.ValidationMetadata;"); // for getNewInstance
+        imports.add("import "+generatorSettings.packageName + ".configurations.JsonSchemaKeywordFlags;"); // for getNewInstance
         imports.add("import org.checkerframework.checker.nullness.qual.Nullable;");
     }
 
     private void addBooleanSchemaImports(Set<String> imports, CodegenSchema schema) {
-        imports.add("import " + packageName + ".schemas.validation.BooleanSchemaValidator;");
+        imports.add("import " + generatorSettings.packageName + ".schemas.validation.BooleanSchemaValidator;");
         addAllOfValidator(schema, imports);
         addAnyOfValidator(schema, imports);
         addOneOfValidator(schema, imports);
@@ -2078,7 +1969,7 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
     }
 
     private void addNullSchemaImports(Set<String> imports, CodegenSchema schema) {
-        imports.add("import " + packageName + ".schemas.validation.NullSchemaValidator;");
+        imports.add("import " + generatorSettings.packageName + ".schemas.validation.NullSchemaValidator;");
         addAllOfValidator(schema, imports);
         addAnyOfValidator(schema, imports);
         addOneOfValidator(schema, imports);
@@ -2088,8 +1979,8 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
     }
 
     private void addMapSchemaImports(Set<String> imports, CodegenSchema schema) {
-        imports.add("import " + packageName + ".schemas.validation.MapSchemaValidator;");
-        imports.add("import "+packageName + ".schemas.validation.FrozenMap;");
+        imports.add("import " + generatorSettings.packageName + ".schemas.validation.MapSchemaValidator;");
+        imports.add("import "+generatorSettings.packageName + ".schemas.validation.FrozenMap;");
         imports.add("import java.util.Map;");
         imports.add("import java.util.ArrayList;"); // for castToAllowedTypes
         imports.add("import java.util.LinkedHashMap;");
@@ -2105,8 +1996,8 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
     }
 
     private void addListSchemaImports(Set<String> imports, CodegenSchema schema) {
-        imports.add("import " + packageName + ".schemas.validation.ListSchemaValidator;");
-        imports.add("import "+packageName + ".schemas.validation.FrozenList;");
+        imports.add("import " + generatorSettings.packageName + ".schemas.validation.ListSchemaValidator;");
+        imports.add("import "+generatorSettings.packageName + ".schemas.validation.FrozenList;");
         imports.add("import java.util.List;");
         imports.add("import java.util.ArrayList;"); // for castToAllowedTypes
         imports.add("import java.util.LinkedHashMap;");
@@ -2116,7 +2007,7 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
     }
 
     private void addNumberSchemaImports(Set<String> imports, CodegenSchema schema) {
-        imports.add("import " + packageName + ".schemas.validation.NumberSchemaValidator;");
+        imports.add("import " + generatorSettings.packageName + ".schemas.validation.NumberSchemaValidator;");
         addAllOfValidator(schema, imports);
         addAnyOfValidator(schema, imports);
         addOneOfValidator(schema, imports);
@@ -2140,7 +2031,7 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
                     break;
             }
         }
-        imports.add("import " + packageName + ".schemas.validation.StringSchemaValidator;");
+        imports.add("import " + generatorSettings.packageName + ".schemas.validation.StringSchemaValidator;");
         addAllOfValidator(schema, imports);
         addAnyOfValidator(schema, imports);
         addOneOfValidator(schema, imports);
@@ -2153,7 +2044,7 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
 
     @Override
     public String getImport(CodegenRefInfo<?> refInfo) {
-        String prefix = "import " + packageName + ".components.";
+        String prefix = "import " + generatorSettings.packageName + ".components.";
         if (refInfo.ref instanceof CodegenSchema) {
             if (refInfo.refModuleAlias == null) {
                 return "import " + refInfo.refModuleLocation + "." + refInfo.refModule + ";";
@@ -2175,16 +2066,19 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
     }
 
     protected String getModuleLocation(String ref) {
-        String filePath = getFilepath(ref);
-        String prefix = outputFolder + File.separatorChar + "src" + File.separatorChar + "main" + File.separatorChar + "java" + File.separatorChar;
+        String filePath = getFilePath(GeneratedFileType.CODE, ref);
+        String prefix = generatorSettings.outputFolder + File.separatorChar + "src" + File.separatorChar + "main" + File.separatorChar + "java" + File.separatorChar;
         String localFilepath = filePath.substring(prefix.length());
         return localFilepath.replaceAll(String.valueOf(File.separatorChar), ".");
     }
 
     @Override
-    public String getTestFilepath(String jsonPath) {
+    public String getFilePath(GeneratedFileType type, String jsonPath) {
+        if (type != GeneratedFileType.TEST) {
+            return super.getFilePath(type, jsonPath);
+        }
         String[] pathPieces = jsonPath.split("/");
-        pathPieces[0] = outputFolder + File.separatorChar + testPackagePath();
+        pathPieces[0] = generatorSettings.outputFolder + File.separatorChar + testPackagePath();
         if (jsonPath.startsWith("#/components")) {
             // #/components/schemas/someSchema
             updateComponentsFilepath(pathPieces);
@@ -2194,8 +2088,8 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
             }
         }
         List<String> finalPathPieces = Arrays.stream(pathPieces)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
         return String.join(File.separator, finalPathPieces);
     }
 
@@ -2340,7 +2234,7 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
         LinkedHashMap<String, EnumValue> enumNameToValue = new LinkedHashMap<>();
         int truncateIdx = 0;
 
-        if (isRemoveEnumValuePrefix()) {
+        if (generatorSettings.removeEnumValuePrefix) {
             String commonPrefix = findCommonPrefixOfVars(values);
             truncateIdx = commonPrefix.length();
         }
@@ -2597,9 +2491,216 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
         return builders;
     }
 
+    private String getPathClassNamePrefix(String jsonPath) {
+        // #/paths/somePath/get -> SomepathGet
+        String[] pathPieces = jsonPath.split("/");
+        String pathJsonPath = "#/paths/"+pathPieces[2];
+        String pathClassName = getFilename(CodegenKeyType.PATH, ModelUtils.decodeSlashes(pathPieces[2]), pathJsonPath);
+        return pathClassName + StringUtils.capitalize(pathPieces[3]);
+    }
+
     @Override
-    public String toOperationFilename(String name, String jsonPath) {
-        return StringUtils.capitalize(name);
+    public String getPascalCase(CodegenKeyType type, String lastJsonPathFragment, String jsonPath) {
+        switch (type) {
+            case SCHEMA:
+                return getSchemaPascalCaseName(lastJsonPathFragment, jsonPath, true);
+            case PATH:
+                return camelize(getFilename(CodegenKeyType.PATH, lastJsonPathFragment, jsonPath));
+            case REQUEST_BODY:
+                if (jsonPath.startsWith("#/paths")) {
+                    String prefix = getPathClassNamePrefix(jsonPath);
+                    return prefix + "RequestBody";
+                }
+                return toModelName(lastJsonPathFragment, jsonPath);
+            case MISC:
+            case HEADER:
+            case CONTENT_TYPE:
+            case SECURITY_SCHEME:
+                return toModelName(lastJsonPathFragment, jsonPath);
+            case OPERATION:
+                return getFilename(CodegenKeyType.OPERATION, lastJsonPathFragment, jsonPath);
+            case PARAMETER:
+                return getFilename(CodegenKeyType.PARAMETER, lastJsonPathFragment, jsonPath);
+            case RESPONSE:
+                if (jsonPath.startsWith("#/components/responses/")) {
+                    return toModelName(lastJsonPathFragment, null);
+                } else {
+                    String prefix = getPathClassNamePrefix(jsonPath);
+                    if (jsonPath.endsWith("/responses")) {
+                        // #/paths/somePath/get/responses
+                        return prefix + "Responses";
+                    }
+                    // #/paths/somePath/get/responses/200
+                    return prefix + "Code" + lastJsonPathFragment + "Response";
+                }
+            case SERVER:
+                String[] pathPieces = jsonPath.split("/");
+                if (jsonPath.startsWith("#/servers")) {
+                    if (pathPieces.length == 2) {
+                        // #/servers
+                        return "RootServerInfo";
+                    }
+                    // #/servers/0
+                    return "RootServer"+pathPieces[2];
+                } else if (jsonPath.startsWith("#/paths") && pathPieces.length >= 4 && pathPieces[3].equals("servers")) {
+                    CodegenKey pathKey = getKey(ModelUtils.decodeSlashes(pathPieces[2]), "paths", jsonPath);
+                    if (pathPieces.length == 4) {
+                        // #/paths/somePath/servers
+                        return pathKey.pascalCase + "ServerInfo";
+                    }
+                    // #/paths/somePath/servers/0
+                    return pathKey.pascalCase + "Server"+ pathPieces[4];
+                }
+                // jsonPath.startsWith("#/paths") && pathPieces.length >= 5 && pathPieces[4].equals("servers")
+                String prefix = getPathClassNamePrefix(jsonPath);
+                if (pathPieces.length == 5) {
+                    // #/paths/somePath/get/servers
+                    return prefix + "ServerInfo";
+                }
+                // #/paths/somePath/get/servers/0
+                return prefix + "Server" + pathPieces[5];
+            case SECURITY:
+                return getFilename(CodegenKeyType.SECURITY, lastJsonPathFragment, jsonPath);
+            default:
+                return null;
+        }
+    }
+
+    @Override
+    public String getFilename(CodegenKeyType type, String lastJsonPathFragment, String jsonPath) {
+        String[] pathPieces = jsonPath.split("/");
+        switch(type) {
+            case SCHEMA:
+                String modelName = schemaJsonPathToModelName.get(jsonPath);
+                if (modelName != null) {
+                    return modelName;
+                }
+                return getSchemaPascalCaseName(pathPieces[pathPieces.length-1], jsonPath, false);
+            case SERVER:
+                return getPascalCase(CodegenKeyType.SERVER, lastJsonPathFragment, jsonPath);
+            case SECURITY_SCHEME:
+                return toModelName(lastJsonPathFragment, jsonPath);
+            case OPERATION:
+                String pathJsonPath = "#/paths/"+pathPieces[2];
+                String pthClassName = getFilename(CodegenKeyType.PATH, ModelUtils.decodeSlashes(pathPieces[2]), pathJsonPath);
+                String operationFileName = pthClassName + StringUtils.capitalize(lastJsonPathFragment);
+                return operationFileName;
+            case PARAMETER:
+                if (jsonPath.startsWith("#/components/parameters/")) {
+                    if (pathPieces.length == 4) {
+                        // #/components/parameters/SomeParameter
+                        return toModelName(lastJsonPathFragment, null);
+                    }
+                    return toModuleFilename(lastJsonPathFragment, jsonPath);
+                }
+                if (operationVerbs.contains(pathPieces[3])) {
+                    if (pathPieces.length == 5) {
+                        // #/paths/somePath/verb/parameters
+                        return "Parameters";
+                    }
+                    if (pathPieces[pathPieces.length-2].equals("parameters") && isInteger(lastJsonPathFragment) && pathPieces.length == 6) {
+                        // #/paths/somePath/verb/parameters/0
+                        return "Parameter" + lastJsonPathFragment;
+                    }
+                    return "parameter" + lastJsonPathFragment;
+                }
+                if (pathPieces[pathPieces.length-2].equals("parameters") && isInteger(lastJsonPathFragment) && pathPieces.length == 5) {
+                    // #/paths/somePath/parameters/0
+                    return "RouteParameter" + lastJsonPathFragment;
+                }
+                return "routeparameter" + lastJsonPathFragment;
+            case PATH:
+                boolean pathClassCase = (pathPieces.length == 3 || (pathPieces.length == 4 && pathPieces[1].equals("apis")));
+                if (pathClassCase) {
+                    // #/paths/somePath -> Somepath
+                    // #/apis/paths/somePath -> Somepath
+                    String moduleFilename = toModuleFilename(lastJsonPathFragment, jsonPath);
+                    return camelize(moduleFilename, false);
+                }
+                // #/paths/somePath/blah -> somepath
+                return toModuleFilename(lastJsonPathFragment, jsonPath);
+            case HEADER:
+                if (jsonPath.startsWith("#/components/headers/")) {
+                    if (pathPieces.length == 4) {
+                        // #/components/headers/SomeHeader
+                        return toModelName(lastJsonPathFragment, null);
+                    }
+                    // deeper paths
+                    return toModuleFilename(lastJsonPathFragment, jsonPath);
+                } else if (jsonPath.startsWith("#/components/responses/")) {
+                    if (pathPieces.length == 5) {
+                        // #/components/responses/SomeResponse/headers
+                        return "Headers";
+                    } else if (pathPieces.length == 6) {
+                        // #/components/responses/SomeResponse/headers/SomeHeader
+                        return toModelName(lastJsonPathFragment, null);
+                    }
+                    // deeper paths
+                    return toModuleFilename(lastJsonPathFragment, jsonPath);
+                }
+                if (pathPieces.length == 7) {
+                    // #/paths/somePath/verb/responses/200/headers
+                    return "Headers";
+                } else if (pathPieces.length == 8) {
+                    // #/paths/somePath/verb/responses/200/headers/SomeHeader
+                    return toModelName(lastJsonPathFragment, null);
+                }
+                // deeper paths
+                return toModuleFilename(lastJsonPathFragment, jsonPath);
+            case REQUEST_BODY:
+                if (pathPieces[2].equals("requestbodies") || pathPieces[2].equals("requestBodies")) {
+                    if (pathPieces.length == 4) {
+                        // #/components/requestBodies/Pet
+                        return toModelName(lastJsonPathFragment, null);
+                    }
+                    return toModuleFilename(lastJsonPathFragment, null);
+                }
+                if (pathPieces.length == 5) {
+                    // #/paths/somePath/verb/requestBody
+                    String pathClassName = getPathClassNamePrefix(jsonPath);
+                    return pathClassName + "RequestBody";
+                }
+                return toModuleFilename(lastJsonPathFragment, null);
+            case CONTENT_TYPE:
+                return toModuleFilename(lastJsonPathFragment, null);
+            case SECURITY:
+                if (pathPieces.length == 2) {
+                    // #/security
+                    return "SecurityInfo";
+                } else if (pathPieces.length == 3) {
+                    // #/security/0
+                    return "SecurityRequirementObject"+pathPieces[pathPieces.length-1];
+                } else if (pathPieces.length == 5) {
+                    // #/paths/somePath/verb/security
+                    String prefix = getPathClassNamePrefix(jsonPath);
+                    return prefix + "SecurityInfo";
+                }
+                // pathPieces.length == 6
+                // #/paths/somePath/verb/security/0
+                String prefix = getPathClassNamePrefix(jsonPath);
+                return prefix + "SecurityRequirementObject"+pathPieces[pathPieces.length-1];
+            case RESPONSE:
+                if (jsonPath.startsWith("#/components/responses/")) {
+                    if (pathPieces.length == 4) {
+                        // #/components/responses/SomeResponse
+                        return toModelName(lastJsonPathFragment, null);
+                    }
+                    return toModuleFilename(lastJsonPathFragment, jsonPath);
+                }
+                String clsNamePrefix = getPathClassNamePrefix(jsonPath);
+                switch (pathPieces.length) {
+                    case 5:
+                        // #/paths/somePath/verb/responses
+                        return clsNamePrefix + "Responses";
+                    case 6:
+                        // #/paths/somePath/verb/responses/200
+                        return clsNamePrefix + "Code"+ lastJsonPathFragment + "Response";
+                    default:
+                        return toModuleFilename("code"+lastJsonPathFragment+"response", null);
+                }
+            default:
+                return null;
+        }
     }
 
     protected List<MapBuilder<CodegenSchema>> getMapBuilders(CodegenSchema schema, String currentJsonPath, String sourceJsonPath) {
@@ -2694,11 +2795,6 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
         // Sanitize any config options here. We also have to update the additionalProperties because
         // the whole additionalProperties object is injected into the main object passed to the mustache layer
 
-        this.setApiPackage(sanitizePackageName(apiPackage));
-        if (additionalProperties.containsKey(CodegenConstants.API_PACKAGE)) {
-            this.additionalProperties.put(CodegenConstants.API_PACKAGE, apiPackage);
-        }
-
         this.setModelPackage(sanitizePackageName(modelPackage));
 
         this.setInvokerPackage(sanitizePackageName(invokerPackage));
@@ -2765,17 +2861,6 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
             startsWithTwoUppercaseLetters = name.substring(0, 2).equals(name.substring(0, 2).toUpperCase(Locale.ROOT));
         }
         return startsWithTwoUppercaseLetters;
-    }
-
-    @Override
-    public String toParamName(String name) {
-        // to avoid conflicts with 'callback' parameter for async call
-        if ("callback".equals(name)) {
-            return "paramCallback";
-        }
-
-        // should be the same as variable name
-        return toVarName(name);
     }
 
     @Override
@@ -3129,27 +3214,6 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
     }
 
     @Override
-    public String toSecurityFilename(String basename, String jsonPath) {
-        String[] pathPieces = jsonPath.split("/");
-        if (pathPieces.length == 2) {
-            // #/security
-            return "SecurityInfo";
-        } else if (pathPieces.length == 3) {
-            // #/security/0
-            return "SecurityRequirementObject"+pathPieces[pathPieces.length-1];
-        } else if (pathPieces.length == 5) {
-            // #/paths/somePath/verb/security
-            CodegenKey pathKey = getKey(ModelUtils.decodeSlashes(pathPieces[2]), "paths", jsonPath);
-            return pathKey.pascalCase + StringUtils.capitalize(pathPieces[3]) + "SecurityInfo";
-        } else if (pathPieces.length == 6) {
-            // #/paths/somePath/verb/security/0
-            CodegenKey pathKey = getKey(ModelUtils.decodeSlashes(pathPieces[2]), "paths", jsonPath);
-            return pathKey.pascalCase + StringUtils.capitalize(pathPieces[3]) + "SecurityRequirementObject"+pathPieces[pathPieces.length-1];
-        }
-        return null;
-    }
-
-    @Override
     public void preprocessOpenAPI(OpenAPI openAPI) {
         super.preprocessOpenAPI(openAPI);
         if (openAPI == null) {
@@ -3168,10 +3232,20 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
                 this.setArtifactVersion(ARTIFACT_VERSION_DEFAULT_VALUE);
             }
         }
-        additionalProperties.put(CodegenConstants.ARTIFACT_VERSION, artifactVersion);
-
+        // must be sequential after initial setting above
         if (additionalProperties.containsKey(CodegenConstants.SNAPSHOT_VERSION)) {
-            if (convertPropertyToBooleanAndWriteBack(CodegenConstants.SNAPSHOT_VERSION)) {
+            final Object booleanValue = additionalProperties.get(CodegenConstants.SNAPSHOT_VERSION);
+            boolean result1 = Boolean.FALSE;
+            if (booleanValue instanceof Boolean) {
+                result1 = (Boolean) booleanValue;
+            } else if (booleanValue instanceof String) {
+                result1 = Boolean.parseBoolean((String) booleanValue);
+            } else {
+                LOGGER.warn("The value (generator's option) must be either boolean or string. Default to `false`.");
+            }
+            boolean result = result1;
+            additionalProperties.put(CodegenConstants.SNAPSHOT_VERSION, result);
+            if (result) {
                 this.setArtifactVersion(this.buildSnapshotVersion(this.getArtifactVersion()));
             }
         }
@@ -3201,14 +3275,6 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
 
     public void setGroupId(String groupId) {
         this.groupId = groupId;
-    }
-
-    public String getArtifactId() {
-        return artifactId;
-    }
-
-    public void setArtifactId(String artifactId) {
-        this.artifactId = artifactId;
     }
 
     public String getArtifactVersion() {
@@ -3313,14 +3379,6 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
 
     public void setSourceFolder(String sourceFolder) {
         this.sourceFolder = sourceFolder;
-    }
-
-    @Override
-    public void setOutputDir(String dir) {
-        super.setOutputDir(dir);
-        if (this.outputTestFolder.isEmpty()) {
-            setOutputTestFolder(dir);
-        }
     }
 
     public void setOutputTestFolder(String outputTestFolder) {
@@ -3450,6 +3508,26 @@ public class JavaClientGenerator extends DefaultGenerator implements Generator {
             return false;
         }
         return true;
+    }
+
+    @Override
+    public String toApiFilename(String name) {
+        return toApiName(name);
+    }
+
+    @Override
+    public String toApiName(String name) {
+        if (name.isEmpty()) {
+            return "DefaultApi";
+        }
+        String usedName = sanitizeName(name, "[^a-zA-Z0-9]+");
+        // todo check if empty and if so them use enum name
+        // todo fix this, this does not handle names starting with numbers
+        if (usedName.isEmpty()) {
+            usedName = toEnumVarName(name, null).toLowerCase(Locale.ROOT);
+        }
+        usedName = camelize(usedName, false);
+        return usedName;
     }
 
     protected String responsePathFromDocRoot(String sourceJsonPath) {

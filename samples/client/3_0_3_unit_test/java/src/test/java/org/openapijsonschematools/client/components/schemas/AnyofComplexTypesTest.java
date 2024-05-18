@@ -5,7 +5,6 @@ import org.junit.Test;
 import org.openapijsonschematools.client.configurations.JsonSchemaKeywordFlags;
 import org.openapijsonschematools.client.configurations.SchemaConfiguration;
 import org.openapijsonschematools.client.exceptions.ValidationException;
-import org.openapijsonschematools.client.exceptions.InvalidTypeException;
 import org.openapijsonschematools.client.schemas.validation.MapUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
@@ -15,10 +14,10 @@ import java.util.Map;
 import java.util.AbstractMap;
 
 public class AnyofComplexTypesTest {
-    static final SchemaConfiguration configuration = new SchemaConfiguration(JsonSchemaKeywordFlags.onlyFormat());
+    static final SchemaConfiguration configuration = new SchemaConfiguration(new JsonSchemaKeywordFlags.Builder().format().build());
 
     @Test
-    public void testSecondAnyofValidComplexPasses() {
+    public void testSecondAnyofValidComplexPasses() throws ValidationException {
         // second anyOf valid (complex)
         final var schema = AnyofComplexTypes.AnyofComplexTypes1.getInstance();
         schema.validate(
@@ -33,7 +32,7 @@ public class AnyofComplexTypesTest {
     }
 
     @Test
-    public void testBothAnyofValidComplexPasses() {
+    public void testBothAnyofValidComplexPasses() throws ValidationException {
         // both anyOf valid (complex)
         final var schema = AnyofComplexTypes.AnyofComplexTypes1.getInstance();
         schema.validate(
@@ -52,7 +51,7 @@ public class AnyofComplexTypesTest {
     }
 
     @Test
-    public void testFirstAnyofValidComplexPasses() {
+    public void testFirstAnyofValidComplexPasses() throws ValidationException {
         // first anyOf valid (complex)
         final var schema = AnyofComplexTypes.AnyofComplexTypes1.getInstance();
         schema.validate(
@@ -85,7 +84,7 @@ public class AnyofComplexTypesTest {
                 configuration
             );
             throw new RuntimeException("A different exception must be thrown");
-        } catch (ValidationException | InvalidTypeException ignored) {
+        } catch (ValidationException ignored) {
             ;
         }
     }

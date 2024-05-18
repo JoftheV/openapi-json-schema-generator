@@ -1,16 +1,15 @@
 package org.openapijsonschematools.client.configurations;
 
-import org.openapijsonschematools.client.exceptions.UnsetPropertyException;
 import org.openapijsonschematools.client.securityrequirementobjects.SecurityRequirementObject;
 import org.openapijsonschematools.client.servers.Server;
-import org.openapijsonschematools.client.RootServerInfo;
 import org.openapijsonschematools.client.paths.foo.get.FooGetServerInfo;
 import org.openapijsonschematools.client.paths.petfindbystatus.PetfindbystatusServerInfo;
+import org.openapijsonschematools.client.RootServerInfo;
 import org.openapijsonschematools.client.paths.fake.delete.FakeDeleteSecurityInfo;
 import org.openapijsonschematools.client.paths.fake.post.FakePostSecurityInfo;
+import org.openapijsonschematools.client.paths.fakeclassnametest.patch.FakeclassnametestPatchSecurityInfo;
 import org.openapijsonschematools.client.paths.fakemultiplesecurities.get.FakemultiplesecuritiesGetSecurityInfo;
 import org.openapijsonschematools.client.paths.fakepetiduploadimagewithrequiredfile.post.FakepetiduploadimagewithrequiredfilePostSecurityInfo;
-import org.openapijsonschematools.client.paths.fakeclassnametest.patch.FakeclassnametestPatchSecurityInfo;
 import org.openapijsonschematools.client.paths.pet.post.PetPostSecurityInfo;
 import org.openapijsonschematools.client.paths.pet.put.PetPutSecurityInfo;
 import org.openapijsonschematools.client.paths.petfindbystatus.get.PetfindbystatusGetSecurityInfo;
@@ -31,21 +30,26 @@ import java.util.HashMap;
 
 public class ApiConfiguration {
     private final ServerInfo serverInfo;
+    private final ServerIndexInfo serverIndexInfo;
     private final SecurityInfo securityInfo;
     private final SecurityIndexInfo securityIndexInfo;
     private final @Nullable Duration timeout;
     private final Map<Class<? extends SecurityScheme>, SecurityScheme> securitySchemeInfo;
+    private final Map<String, List< String>> defaultHeaders;
 
     public ApiConfiguration() {
-        serverInfo = new ServerInfo();
+        serverInfo = new ServerInfoBuilder().build();
+        serverIndexInfo = new ServerIndexInfoBuilder().build();
         securityInfo = new SecurityInfo();
-        securityIndexInfo = new SecurityIndexInfo();
+        securityIndexInfo = new SecurityIndexInfoBuilder().build();
         securitySchemeInfo = new HashMap<>();
         timeout = null;
+        defaultHeaders = new HashMap<>();
     }
 
-    public ApiConfiguration(ServerInfo serverInfo, SecurityIndexInfo securityIndexInfo, List<SecurityScheme> securitySchemes, Duration timeout) {
+    public ApiConfiguration(ServerInfo serverInfo, ServerIndexInfo serverIndexInfo, List<SecurityScheme> securitySchemes, SecurityIndexInfo securityIndexInfo, Duration timeout, Map<String, List< String>> defaultHeaders) {
         this.serverInfo = serverInfo;
+        this.serverIndexInfo = serverIndexInfo;
         this.securityInfo = new SecurityInfo();
         this.securityIndexInfo = securityIndexInfo;
         securitySchemeInfo = new HashMap<>();
@@ -53,46 +57,134 @@ public class ApiConfiguration {
             securitySchemeInfo.put(securityScheme.getClass(), securityScheme);
         }
         this.timeout = timeout;
+        this.defaultHeaders = defaultHeaders;
     }
 
     public static class ServerInfo {
-        protected final RootServerInfo rootServerInfo;
-        protected final FooGetServerInfo fooGetServerInfo;
-        protected final PetfindbystatusServerInfo petfindbystatusServerInfo;
+        final FooGetServerInfo.FooGetServerInfo1 fooGetServerInfo;
+        final PetfindbystatusServerInfo.PetfindbystatusServerInfo1 petfindbystatusServerInfo;
+        final RootServerInfo.RootServerInfo1 rootServerInfo;
 
-        public ServerInfo() {
-            rootServerInfo = new RootServerInfo();
-            fooGetServerInfo = new FooGetServerInfo();
-            petfindbystatusServerInfo = new PetfindbystatusServerInfo();
-        }
-
-        public ServerInfo(
-            @Nullable RootServerInfo rootServerInfo,
-            @Nullable FooGetServerInfo fooGetServerInfo,
-            @Nullable PetfindbystatusServerInfo petfindbystatusServerInfo
+        ServerInfo(
+            FooGetServerInfo. @Nullable FooGetServerInfo1 fooGetServerInfo,
+            PetfindbystatusServerInfo. @Nullable PetfindbystatusServerInfo1 petfindbystatusServerInfo,
+            RootServerInfo. @Nullable RootServerInfo1 rootServerInfo
         ) {
-            this.rootServerInfo = Objects.requireNonNullElseGet(rootServerInfo, RootServerInfo::new);
-            this.fooGetServerInfo = Objects.requireNonNullElseGet(fooGetServerInfo, FooGetServerInfo::new);
-            this.petfindbystatusServerInfo = Objects.requireNonNullElseGet(petfindbystatusServerInfo, PetfindbystatusServerInfo::new);
+            this.fooGetServerInfo = Objects.requireNonNullElse(fooGetServerInfo, new FooGetServerInfo.FooGetServerInfoBuilder().build());
+            this.petfindbystatusServerInfo = Objects.requireNonNullElse(petfindbystatusServerInfo, new PetfindbystatusServerInfo.PetfindbystatusServerInfoBuilder().build());
+            this.rootServerInfo = Objects.requireNonNullElse(rootServerInfo, new RootServerInfo.RootServerInfoBuilder().build());
         }
+    }
+
+    public static class ServerInfoBuilder {
+        private FooGetServerInfo. @Nullable FooGetServerInfo1 fooGetServerInfo;
+        private PetfindbystatusServerInfo. @Nullable PetfindbystatusServerInfo1 petfindbystatusServerInfo;
+        private RootServerInfo. @Nullable RootServerInfo1 rootServerInfo;
+        public ServerInfoBuilder() {}
+
+        public ServerInfoBuilder fooGetServerInfo(FooGetServerInfo.FooGetServerInfo1 fooGetServerInfo) {
+            this.fooGetServerInfo = fooGetServerInfo;
+            return this;
+        }
+
+        public ServerInfoBuilder petfindbystatusServerInfo(PetfindbystatusServerInfo.PetfindbystatusServerInfo1 petfindbystatusServerInfo) {
+            this.petfindbystatusServerInfo = petfindbystatusServerInfo;
+            return this;
+        }
+
+        public ServerInfoBuilder rootServerInfo(RootServerInfo.RootServerInfo1 rootServerInfo) {
+            this.rootServerInfo = rootServerInfo;
+            return this;
+        }
+
+        public ServerInfo build() {
+            return new ServerInfo(
+                fooGetServerInfo,
+                petfindbystatusServerInfo,
+                rootServerInfo
+            );
+        }
+    }
+
+    public static class ServerIndexInfo {
+        final FooGetServerInfo.ServerIndex fooGetServerInfoServerIndex;
+        final PetfindbystatusServerInfo.ServerIndex petfindbystatusServerInfoServerIndex;
+        final RootServerInfo.ServerIndex rootServerInfoServerIndex;
+
+        ServerIndexInfo(
+            FooGetServerInfo. @Nullable ServerIndex fooGetServerInfoServerIndex,
+            PetfindbystatusServerInfo. @Nullable ServerIndex petfindbystatusServerInfoServerIndex,
+            RootServerInfo. @Nullable ServerIndex rootServerInfoServerIndex
+        ) {
+            this.fooGetServerInfoServerIndex = Objects.requireNonNullElse(fooGetServerInfoServerIndex, FooGetServerInfo.ServerIndex.SERVER_0);
+            this.petfindbystatusServerInfoServerIndex = Objects.requireNonNullElse(petfindbystatusServerInfoServerIndex, PetfindbystatusServerInfo.ServerIndex.SERVER_0);
+            this.rootServerInfoServerIndex = Objects.requireNonNullElse(rootServerInfoServerIndex, RootServerInfo.ServerIndex.SERVER_0);
+        }
+    }
+
+    public static class ServerIndexInfoBuilder {
+        private FooGetServerInfo. @Nullable ServerIndex fooGetServerInfoServerIndex;
+        private PetfindbystatusServerInfo. @Nullable ServerIndex petfindbystatusServerInfoServerIndex;
+        private RootServerInfo. @Nullable ServerIndex rootServerInfoServerIndex;
+        public ServerIndexInfoBuilder() {}
+
+        public ServerIndexInfoBuilder fooGetServerInfoServerIndex(FooGetServerInfo.ServerIndex serverIndex) {
+            this.fooGetServerInfoServerIndex = serverIndex;
+            return this;
+        }
+
+        public ServerIndexInfoBuilder petfindbystatusServerInfoServerIndex(PetfindbystatusServerInfo.ServerIndex serverIndex) {
+            this.petfindbystatusServerInfoServerIndex = serverIndex;
+            return this;
+        }
+
+        public ServerIndexInfoBuilder rootServerInfoServerIndex(RootServerInfo.ServerIndex serverIndex) {
+            this.rootServerInfoServerIndex = serverIndex;
+            return this;
+        }
+
+        public ServerIndexInfo build() {
+            return new ServerIndexInfo(
+                fooGetServerInfoServerIndex,
+                petfindbystatusServerInfoServerIndex,
+                rootServerInfoServerIndex
+            );
+        }
+    }
+
+    public Server getServer(FooGetServerInfo. @Nullable ServerIndex serverIndex) {
+        var serverProvider = serverInfo.fooGetServerInfo;
+        if (serverIndex == null) {
+            FooGetServerInfo.ServerIndex configServerIndex = serverIndexInfo.fooGetServerInfoServerIndex;
+            return serverProvider.getServer(configServerIndex);
+        }
+        return serverProvider.getServer(serverIndex);
+    }
+
+    public Server getServer(PetfindbystatusServerInfo. @Nullable ServerIndex serverIndex) {
+        var serverProvider = serverInfo.petfindbystatusServerInfo;
+        if (serverIndex == null) {
+            PetfindbystatusServerInfo.ServerIndex configServerIndex = serverIndexInfo.petfindbystatusServerInfoServerIndex;
+            return serverProvider.getServer(configServerIndex);
+        }
+        return serverProvider.getServer(serverIndex);
     }
 
     public Server getServer(RootServerInfo. @Nullable ServerIndex serverIndex) {
-        return serverInfo.rootServerInfo.getServer(serverIndex);
-    }
-    public Server getServer(FooGetServerInfo. @Nullable ServerIndex serverIndex) {
-        return serverInfo.fooGetServerInfo.getServer(serverIndex);
-    }
-    public Server getServer(PetfindbystatusServerInfo. @Nullable ServerIndex serverIndex) {
-        return serverInfo.petfindbystatusServerInfo.getServer(serverIndex);
+        var serverProvider = serverInfo.rootServerInfo;
+        if (serverIndex == null) {
+            RootServerInfo.ServerIndex configServerIndex = serverIndexInfo.rootServerInfoServerIndex;
+            return serverProvider.getServer(configServerIndex);
+        }
+        return serverProvider.getServer(serverIndex);
     }
 
     public static class SecurityInfo {
         protected final FakeDeleteSecurityInfo.FakeDeleteSecurityInfo1 fakeDeleteSecurityInfo;
         protected final FakePostSecurityInfo.FakePostSecurityInfo1 fakePostSecurityInfo;
+        protected final FakeclassnametestPatchSecurityInfo.FakeclassnametestPatchSecurityInfo1 fakeclassnametestPatchSecurityInfo;
         protected final FakemultiplesecuritiesGetSecurityInfo.FakemultiplesecuritiesGetSecurityInfo1 fakemultiplesecuritiesGetSecurityInfo;
         protected final FakepetiduploadimagewithrequiredfilePostSecurityInfo.FakepetiduploadimagewithrequiredfilePostSecurityInfo1 fakepetiduploadimagewithrequiredfilePostSecurityInfo;
-        protected final FakeclassnametestPatchSecurityInfo.FakeclassnametestPatchSecurityInfo1 fakeclassnametestPatchSecurityInfo;
         protected final PetPostSecurityInfo.PetPostSecurityInfo1 petPostSecurityInfo;
         protected final PetPutSecurityInfo.PetPutSecurityInfo1 petPutSecurityInfo;
         protected final PetfindbystatusGetSecurityInfo.PetfindbystatusGetSecurityInfo1 petfindbystatusGetSecurityInfo;
@@ -106,9 +198,9 @@ public class ApiConfiguration {
         public SecurityInfo() {
             this.fakeDeleteSecurityInfo = new FakeDeleteSecurityInfo.FakeDeleteSecurityInfo1();
             this.fakePostSecurityInfo = new FakePostSecurityInfo.FakePostSecurityInfo1();
+            this.fakeclassnametestPatchSecurityInfo = new FakeclassnametestPatchSecurityInfo.FakeclassnametestPatchSecurityInfo1();
             this.fakemultiplesecuritiesGetSecurityInfo = new FakemultiplesecuritiesGetSecurityInfo.FakemultiplesecuritiesGetSecurityInfo1();
             this.fakepetiduploadimagewithrequiredfilePostSecurityInfo = new FakepetiduploadimagewithrequiredfilePostSecurityInfo.FakepetiduploadimagewithrequiredfilePostSecurityInfo1();
-            this.fakeclassnametestPatchSecurityInfo = new FakeclassnametestPatchSecurityInfo.FakeclassnametestPatchSecurityInfo1();
             this.petPostSecurityInfo = new PetPostSecurityInfo.PetPostSecurityInfo1();
             this.petPutSecurityInfo = new PetPutSecurityInfo.PetPutSecurityInfo1();
             this.petfindbystatusGetSecurityInfo = new PetfindbystatusGetSecurityInfo.PetfindbystatusGetSecurityInfo1();
@@ -122,244 +214,269 @@ public class ApiConfiguration {
     }
 
     public static class SecurityIndexInfo {
-        protected FakeDeleteSecurityInfo. @Nullable SecurityIndex fakeDeleteSecurityInfoSecurityIndex;
-        protected FakePostSecurityInfo. @Nullable SecurityIndex fakePostSecurityInfoSecurityIndex;
-        protected FakemultiplesecuritiesGetSecurityInfo. @Nullable SecurityIndex fakemultiplesecuritiesGetSecurityInfoSecurityIndex;
-        protected FakepetiduploadimagewithrequiredfilePostSecurityInfo. @Nullable SecurityIndex fakepetiduploadimagewithrequiredfilePostSecurityInfoSecurityIndex;
-        protected FakeclassnametestPatchSecurityInfo. @Nullable SecurityIndex fakeclassnametestPatchSecurityInfoSecurityIndex;
-        protected PetPostSecurityInfo. @Nullable SecurityIndex petPostSecurityInfoSecurityIndex;
-        protected PetPutSecurityInfo. @Nullable SecurityIndex petPutSecurityInfoSecurityIndex;
-        protected PetfindbystatusGetSecurityInfo. @Nullable SecurityIndex petfindbystatusGetSecurityInfoSecurityIndex;
-        protected PetfindbytagsGetSecurityInfo. @Nullable SecurityIndex petfindbytagsGetSecurityInfoSecurityIndex;
-        protected PetpetidDeleteSecurityInfo. @Nullable SecurityIndex petpetidDeleteSecurityInfoSecurityIndex;
-        protected PetpetidGetSecurityInfo. @Nullable SecurityIndex petpetidGetSecurityInfoSecurityIndex;
-        protected PetpetidPostSecurityInfo. @Nullable SecurityIndex petpetidPostSecurityInfoSecurityIndex;
-        protected PetpetiduploadimagePostSecurityInfo. @Nullable SecurityIndex petpetiduploadimagePostSecurityInfoSecurityIndex;
-        protected StoreinventoryGetSecurityInfo. @Nullable SecurityIndex storeinventoryGetSecurityInfoSecurityIndex;
+        final FakeDeleteSecurityInfo.SecurityIndex fakeDeleteSecurityInfoSecurityIndex;
+        final FakePostSecurityInfo.SecurityIndex fakePostSecurityInfoSecurityIndex;
+        final FakeclassnametestPatchSecurityInfo.SecurityIndex fakeclassnametestPatchSecurityInfoSecurityIndex;
+        final FakemultiplesecuritiesGetSecurityInfo.SecurityIndex fakemultiplesecuritiesGetSecurityInfoSecurityIndex;
+        final FakepetiduploadimagewithrequiredfilePostSecurityInfo.SecurityIndex fakepetiduploadimagewithrequiredfilePostSecurityInfoSecurityIndex;
+        final PetPostSecurityInfo.SecurityIndex petPostSecurityInfoSecurityIndex;
+        final PetPutSecurityInfo.SecurityIndex petPutSecurityInfoSecurityIndex;
+        final PetfindbystatusGetSecurityInfo.SecurityIndex petfindbystatusGetSecurityInfoSecurityIndex;
+        final PetfindbytagsGetSecurityInfo.SecurityIndex petfindbytagsGetSecurityInfoSecurityIndex;
+        final PetpetidDeleteSecurityInfo.SecurityIndex petpetidDeleteSecurityInfoSecurityIndex;
+        final PetpetidGetSecurityInfo.SecurityIndex petpetidGetSecurityInfoSecurityIndex;
+        final PetpetidPostSecurityInfo.SecurityIndex petpetidPostSecurityInfoSecurityIndex;
+        final PetpetiduploadimagePostSecurityInfo.SecurityIndex petpetiduploadimagePostSecurityInfoSecurityIndex;
+        final StoreinventoryGetSecurityInfo.SecurityIndex storeinventoryGetSecurityInfoSecurityIndex;
 
-        public SecurityIndexInfo() {}
+        SecurityIndexInfo(
+            FakeDeleteSecurityInfo. @Nullable SecurityIndex fakeDeleteSecurityInfoSecurityIndex,
+            FakePostSecurityInfo. @Nullable SecurityIndex fakePostSecurityInfoSecurityIndex,
+            FakeclassnametestPatchSecurityInfo. @Nullable SecurityIndex fakeclassnametestPatchSecurityInfoSecurityIndex,
+            FakemultiplesecuritiesGetSecurityInfo. @Nullable SecurityIndex fakemultiplesecuritiesGetSecurityInfoSecurityIndex,
+            FakepetiduploadimagewithrequiredfilePostSecurityInfo. @Nullable SecurityIndex fakepetiduploadimagewithrequiredfilePostSecurityInfoSecurityIndex,
+            PetPostSecurityInfo. @Nullable SecurityIndex petPostSecurityInfoSecurityIndex,
+            PetPutSecurityInfo. @Nullable SecurityIndex petPutSecurityInfoSecurityIndex,
+            PetfindbystatusGetSecurityInfo. @Nullable SecurityIndex petfindbystatusGetSecurityInfoSecurityIndex,
+            PetfindbytagsGetSecurityInfo. @Nullable SecurityIndex petfindbytagsGetSecurityInfoSecurityIndex,
+            PetpetidDeleteSecurityInfo. @Nullable SecurityIndex petpetidDeleteSecurityInfoSecurityIndex,
+            PetpetidGetSecurityInfo. @Nullable SecurityIndex petpetidGetSecurityInfoSecurityIndex,
+            PetpetidPostSecurityInfo. @Nullable SecurityIndex petpetidPostSecurityInfoSecurityIndex,
+            PetpetiduploadimagePostSecurityInfo. @Nullable SecurityIndex petpetiduploadimagePostSecurityInfoSecurityIndex,
+            StoreinventoryGetSecurityInfo. @Nullable SecurityIndex storeinventoryGetSecurityInfoSecurityIndex
+        ) {
+            this.fakeDeleteSecurityInfoSecurityIndex = Objects.requireNonNullElse(fakeDeleteSecurityInfoSecurityIndex, FakeDeleteSecurityInfo.SecurityIndex.SECURITY_0);
+            this.fakePostSecurityInfoSecurityIndex = Objects.requireNonNullElse(fakePostSecurityInfoSecurityIndex, FakePostSecurityInfo.SecurityIndex.SECURITY_0);
+            this.fakeclassnametestPatchSecurityInfoSecurityIndex = Objects.requireNonNullElse(fakeclassnametestPatchSecurityInfoSecurityIndex, FakeclassnametestPatchSecurityInfo.SecurityIndex.SECURITY_0);
+            this.fakemultiplesecuritiesGetSecurityInfoSecurityIndex = Objects.requireNonNullElse(fakemultiplesecuritiesGetSecurityInfoSecurityIndex, FakemultiplesecuritiesGetSecurityInfo.SecurityIndex.SECURITY_0);
+            this.fakepetiduploadimagewithrequiredfilePostSecurityInfoSecurityIndex = Objects.requireNonNullElse(fakepetiduploadimagewithrequiredfilePostSecurityInfoSecurityIndex, FakepetiduploadimagewithrequiredfilePostSecurityInfo.SecurityIndex.SECURITY_0);
+            this.petPostSecurityInfoSecurityIndex = Objects.requireNonNullElse(petPostSecurityInfoSecurityIndex, PetPostSecurityInfo.SecurityIndex.SECURITY_0);
+            this.petPutSecurityInfoSecurityIndex = Objects.requireNonNullElse(petPutSecurityInfoSecurityIndex, PetPutSecurityInfo.SecurityIndex.SECURITY_0);
+            this.petfindbystatusGetSecurityInfoSecurityIndex = Objects.requireNonNullElse(petfindbystatusGetSecurityInfoSecurityIndex, PetfindbystatusGetSecurityInfo.SecurityIndex.SECURITY_0);
+            this.petfindbytagsGetSecurityInfoSecurityIndex = Objects.requireNonNullElse(petfindbytagsGetSecurityInfoSecurityIndex, PetfindbytagsGetSecurityInfo.SecurityIndex.SECURITY_0);
+            this.petpetidDeleteSecurityInfoSecurityIndex = Objects.requireNonNullElse(petpetidDeleteSecurityInfoSecurityIndex, PetpetidDeleteSecurityInfo.SecurityIndex.SECURITY_0);
+            this.petpetidGetSecurityInfoSecurityIndex = Objects.requireNonNullElse(petpetidGetSecurityInfoSecurityIndex, PetpetidGetSecurityInfo.SecurityIndex.SECURITY_0);
+            this.petpetidPostSecurityInfoSecurityIndex = Objects.requireNonNullElse(petpetidPostSecurityInfoSecurityIndex, PetpetidPostSecurityInfo.SecurityIndex.SECURITY_0);
+            this.petpetiduploadimagePostSecurityInfoSecurityIndex = Objects.requireNonNullElse(petpetiduploadimagePostSecurityInfoSecurityIndex, PetpetiduploadimagePostSecurityInfo.SecurityIndex.SECURITY_0);
+            this.storeinventoryGetSecurityInfoSecurityIndex = Objects.requireNonNullElse(storeinventoryGetSecurityInfoSecurityIndex, StoreinventoryGetSecurityInfo.SecurityIndex.SECURITY_0);
+        }
+    }
 
-        public SecurityIndexInfo fakeDeleteSecurityInfoSecurityIndex(FakeDeleteSecurityInfo.SecurityIndex securityIndex) {
+    public static class SecurityIndexInfoBuilder {
+        private FakeDeleteSecurityInfo. @Nullable SecurityIndex fakeDeleteSecurityInfoSecurityIndex;
+        private FakePostSecurityInfo. @Nullable SecurityIndex fakePostSecurityInfoSecurityIndex;
+        private FakeclassnametestPatchSecurityInfo. @Nullable SecurityIndex fakeclassnametestPatchSecurityInfoSecurityIndex;
+        private FakemultiplesecuritiesGetSecurityInfo. @Nullable SecurityIndex fakemultiplesecuritiesGetSecurityInfoSecurityIndex;
+        private FakepetiduploadimagewithrequiredfilePostSecurityInfo. @Nullable SecurityIndex fakepetiduploadimagewithrequiredfilePostSecurityInfoSecurityIndex;
+        private PetPostSecurityInfo. @Nullable SecurityIndex petPostSecurityInfoSecurityIndex;
+        private PetPutSecurityInfo. @Nullable SecurityIndex petPutSecurityInfoSecurityIndex;
+        private PetfindbystatusGetSecurityInfo. @Nullable SecurityIndex petfindbystatusGetSecurityInfoSecurityIndex;
+        private PetfindbytagsGetSecurityInfo. @Nullable SecurityIndex petfindbytagsGetSecurityInfoSecurityIndex;
+        private PetpetidDeleteSecurityInfo. @Nullable SecurityIndex petpetidDeleteSecurityInfoSecurityIndex;
+        private PetpetidGetSecurityInfo. @Nullable SecurityIndex petpetidGetSecurityInfoSecurityIndex;
+        private PetpetidPostSecurityInfo. @Nullable SecurityIndex petpetidPostSecurityInfoSecurityIndex;
+        private PetpetiduploadimagePostSecurityInfo. @Nullable SecurityIndex petpetiduploadimagePostSecurityInfoSecurityIndex;
+        private StoreinventoryGetSecurityInfo. @Nullable SecurityIndex storeinventoryGetSecurityInfoSecurityIndex;
+        public SecurityIndexInfoBuilder() {}
+
+        public SecurityIndexInfoBuilder fakeDeleteSecurityInfoSecurityIndex(FakeDeleteSecurityInfo.SecurityIndex securityIndex) {
             this.fakeDeleteSecurityInfoSecurityIndex = securityIndex;
             return this;
         }
 
-        public SecurityIndexInfo fakePostSecurityInfoSecurityIndex(FakePostSecurityInfo.SecurityIndex securityIndex) {
+        public SecurityIndexInfoBuilder fakePostSecurityInfoSecurityIndex(FakePostSecurityInfo.SecurityIndex securityIndex) {
             this.fakePostSecurityInfoSecurityIndex = securityIndex;
             return this;
         }
 
-        public SecurityIndexInfo fakemultiplesecuritiesGetSecurityInfoSecurityIndex(FakemultiplesecuritiesGetSecurityInfo.SecurityIndex securityIndex) {
-            this.fakemultiplesecuritiesGetSecurityInfoSecurityIndex = securityIndex;
-            return this;
-        }
-
-        public SecurityIndexInfo fakepetiduploadimagewithrequiredfilePostSecurityInfoSecurityIndex(FakepetiduploadimagewithrequiredfilePostSecurityInfo.SecurityIndex securityIndex) {
-            this.fakepetiduploadimagewithrequiredfilePostSecurityInfoSecurityIndex = securityIndex;
-            return this;
-        }
-
-        public SecurityIndexInfo fakeclassnametestPatchSecurityInfoSecurityIndex(FakeclassnametestPatchSecurityInfo.SecurityIndex securityIndex) {
+        public SecurityIndexInfoBuilder fakeclassnametestPatchSecurityInfoSecurityIndex(FakeclassnametestPatchSecurityInfo.SecurityIndex securityIndex) {
             this.fakeclassnametestPatchSecurityInfoSecurityIndex = securityIndex;
             return this;
         }
 
-        public SecurityIndexInfo petPostSecurityInfoSecurityIndex(PetPostSecurityInfo.SecurityIndex securityIndex) {
+        public SecurityIndexInfoBuilder fakemultiplesecuritiesGetSecurityInfoSecurityIndex(FakemultiplesecuritiesGetSecurityInfo.SecurityIndex securityIndex) {
+            this.fakemultiplesecuritiesGetSecurityInfoSecurityIndex = securityIndex;
+            return this;
+        }
+
+        public SecurityIndexInfoBuilder fakepetiduploadimagewithrequiredfilePostSecurityInfoSecurityIndex(FakepetiduploadimagewithrequiredfilePostSecurityInfo.SecurityIndex securityIndex) {
+            this.fakepetiduploadimagewithrequiredfilePostSecurityInfoSecurityIndex = securityIndex;
+            return this;
+        }
+
+        public SecurityIndexInfoBuilder petPostSecurityInfoSecurityIndex(PetPostSecurityInfo.SecurityIndex securityIndex) {
             this.petPostSecurityInfoSecurityIndex = securityIndex;
             return this;
         }
 
-        public SecurityIndexInfo petPutSecurityInfoSecurityIndex(PetPutSecurityInfo.SecurityIndex securityIndex) {
+        public SecurityIndexInfoBuilder petPutSecurityInfoSecurityIndex(PetPutSecurityInfo.SecurityIndex securityIndex) {
             this.petPutSecurityInfoSecurityIndex = securityIndex;
             return this;
         }
 
-        public SecurityIndexInfo petfindbystatusGetSecurityInfoSecurityIndex(PetfindbystatusGetSecurityInfo.SecurityIndex securityIndex) {
+        public SecurityIndexInfoBuilder petfindbystatusGetSecurityInfoSecurityIndex(PetfindbystatusGetSecurityInfo.SecurityIndex securityIndex) {
             this.petfindbystatusGetSecurityInfoSecurityIndex = securityIndex;
             return this;
         }
 
-        public SecurityIndexInfo petfindbytagsGetSecurityInfoSecurityIndex(PetfindbytagsGetSecurityInfo.SecurityIndex securityIndex) {
+        public SecurityIndexInfoBuilder petfindbytagsGetSecurityInfoSecurityIndex(PetfindbytagsGetSecurityInfo.SecurityIndex securityIndex) {
             this.petfindbytagsGetSecurityInfoSecurityIndex = securityIndex;
             return this;
         }
 
-        public SecurityIndexInfo petpetidDeleteSecurityInfoSecurityIndex(PetpetidDeleteSecurityInfo.SecurityIndex securityIndex) {
+        public SecurityIndexInfoBuilder petpetidDeleteSecurityInfoSecurityIndex(PetpetidDeleteSecurityInfo.SecurityIndex securityIndex) {
             this.petpetidDeleteSecurityInfoSecurityIndex = securityIndex;
             return this;
         }
 
-        public SecurityIndexInfo petpetidGetSecurityInfoSecurityIndex(PetpetidGetSecurityInfo.SecurityIndex securityIndex) {
+        public SecurityIndexInfoBuilder petpetidGetSecurityInfoSecurityIndex(PetpetidGetSecurityInfo.SecurityIndex securityIndex) {
             this.petpetidGetSecurityInfoSecurityIndex = securityIndex;
             return this;
         }
 
-        public SecurityIndexInfo petpetidPostSecurityInfoSecurityIndex(PetpetidPostSecurityInfo.SecurityIndex securityIndex) {
+        public SecurityIndexInfoBuilder petpetidPostSecurityInfoSecurityIndex(PetpetidPostSecurityInfo.SecurityIndex securityIndex) {
             this.petpetidPostSecurityInfoSecurityIndex = securityIndex;
             return this;
         }
 
-        public SecurityIndexInfo petpetiduploadimagePostSecurityInfoSecurityIndex(PetpetiduploadimagePostSecurityInfo.SecurityIndex securityIndex) {
+        public SecurityIndexInfoBuilder petpetiduploadimagePostSecurityInfoSecurityIndex(PetpetiduploadimagePostSecurityInfo.SecurityIndex securityIndex) {
             this.petpetiduploadimagePostSecurityInfoSecurityIndex = securityIndex;
             return this;
         }
 
-        public SecurityIndexInfo storeinventoryGetSecurityInfoSecurityIndex(StoreinventoryGetSecurityInfo.SecurityIndex securityIndex) {
+        public SecurityIndexInfoBuilder storeinventoryGetSecurityInfoSecurityIndex(StoreinventoryGetSecurityInfo.SecurityIndex securityIndex) {
             this.storeinventoryGetSecurityInfoSecurityIndex = securityIndex;
             return this;
         }
+
+        public SecurityIndexInfo build() {
+            return new SecurityIndexInfo(
+                fakeDeleteSecurityInfoSecurityIndex,
+                fakePostSecurityInfoSecurityIndex,
+                fakeclassnametestPatchSecurityInfoSecurityIndex,
+                fakemultiplesecuritiesGetSecurityInfoSecurityIndex,
+                fakepetiduploadimagewithrequiredfilePostSecurityInfoSecurityIndex,
+                petPostSecurityInfoSecurityIndex,
+                petPutSecurityInfoSecurityIndex,
+                petfindbystatusGetSecurityInfoSecurityIndex,
+                petfindbytagsGetSecurityInfoSecurityIndex,
+                petpetidDeleteSecurityInfoSecurityIndex,
+                petpetidGetSecurityInfoSecurityIndex,
+                petpetidPostSecurityInfoSecurityIndex,
+                petpetiduploadimagePostSecurityInfoSecurityIndex,
+                storeinventoryGetSecurityInfoSecurityIndex
+            );
+        }
     }
 
-    public SecurityRequirementObject getSecurityRequirementObject(FakeDeleteSecurityInfo. @Nullable SecurityIndex securityIndex) throws UnsetPropertyException {
+    public SecurityRequirementObject getSecurityRequirementObject(FakeDeleteSecurityInfo. @Nullable SecurityIndex securityIndex) {
         var securityInfoInstance = securityInfo.fakeDeleteSecurityInfo;
         if (securityIndex == null) {
-            FakeDeleteSecurityInfo. @Nullable SecurityIndex configSecurityIndex = securityIndexInfo.fakeDeleteSecurityInfoSecurityIndex;
-            if (configSecurityIndex == null) {
-                throw new UnsetPropertyException("fakeDeleteSecurityInfoSecurityIndex is unset");
-            }
+            FakeDeleteSecurityInfo.SecurityIndex configSecurityIndex = securityIndexInfo.fakeDeleteSecurityInfoSecurityIndex;
             return securityInfoInstance.getSecurityRequirementObject(configSecurityIndex);
         }
         return securityInfoInstance.getSecurityRequirementObject(securityIndex);
     }
-    public SecurityRequirementObject getSecurityRequirementObject(FakePostSecurityInfo. @Nullable SecurityIndex securityIndex) throws UnsetPropertyException {
+    public SecurityRequirementObject getSecurityRequirementObject(FakePostSecurityInfo. @Nullable SecurityIndex securityIndex) {
         var securityInfoInstance = securityInfo.fakePostSecurityInfo;
         if (securityIndex == null) {
-            FakePostSecurityInfo. @Nullable SecurityIndex configSecurityIndex = securityIndexInfo.fakePostSecurityInfoSecurityIndex;
-            if (configSecurityIndex == null) {
-                throw new UnsetPropertyException("fakePostSecurityInfoSecurityIndex is unset");
-            }
+            FakePostSecurityInfo.SecurityIndex configSecurityIndex = securityIndexInfo.fakePostSecurityInfoSecurityIndex;
             return securityInfoInstance.getSecurityRequirementObject(configSecurityIndex);
         }
         return securityInfoInstance.getSecurityRequirementObject(securityIndex);
     }
-    public SecurityRequirementObject getSecurityRequirementObject(FakemultiplesecuritiesGetSecurityInfo. @Nullable SecurityIndex securityIndex) throws UnsetPropertyException {
-        var securityInfoInstance = securityInfo.fakemultiplesecuritiesGetSecurityInfo;
-        if (securityIndex == null) {
-            FakemultiplesecuritiesGetSecurityInfo. @Nullable SecurityIndex configSecurityIndex = securityIndexInfo.fakemultiplesecuritiesGetSecurityInfoSecurityIndex;
-            if (configSecurityIndex == null) {
-                throw new UnsetPropertyException("fakemultiplesecuritiesGetSecurityInfoSecurityIndex is unset");
-            }
-            return securityInfoInstance.getSecurityRequirementObject(configSecurityIndex);
-        }
-        return securityInfoInstance.getSecurityRequirementObject(securityIndex);
-    }
-    public SecurityRequirementObject getSecurityRequirementObject(FakepetiduploadimagewithrequiredfilePostSecurityInfo. @Nullable SecurityIndex securityIndex) throws UnsetPropertyException {
-        var securityInfoInstance = securityInfo.fakepetiduploadimagewithrequiredfilePostSecurityInfo;
-        if (securityIndex == null) {
-            FakepetiduploadimagewithrequiredfilePostSecurityInfo. @Nullable SecurityIndex configSecurityIndex = securityIndexInfo.fakepetiduploadimagewithrequiredfilePostSecurityInfoSecurityIndex;
-            if (configSecurityIndex == null) {
-                throw new UnsetPropertyException("fakepetiduploadimagewithrequiredfilePostSecurityInfoSecurityIndex is unset");
-            }
-            return securityInfoInstance.getSecurityRequirementObject(configSecurityIndex);
-        }
-        return securityInfoInstance.getSecurityRequirementObject(securityIndex);
-    }
-    public SecurityRequirementObject getSecurityRequirementObject(FakeclassnametestPatchSecurityInfo. @Nullable SecurityIndex securityIndex) throws UnsetPropertyException {
+    public SecurityRequirementObject getSecurityRequirementObject(FakeclassnametestPatchSecurityInfo. @Nullable SecurityIndex securityIndex) {
         var securityInfoInstance = securityInfo.fakeclassnametestPatchSecurityInfo;
         if (securityIndex == null) {
-            FakeclassnametestPatchSecurityInfo. @Nullable SecurityIndex configSecurityIndex = securityIndexInfo.fakeclassnametestPatchSecurityInfoSecurityIndex;
-            if (configSecurityIndex == null) {
-                throw new UnsetPropertyException("fakeclassnametestPatchSecurityInfoSecurityIndex is unset");
-            }
+            FakeclassnametestPatchSecurityInfo.SecurityIndex configSecurityIndex = securityIndexInfo.fakeclassnametestPatchSecurityInfoSecurityIndex;
             return securityInfoInstance.getSecurityRequirementObject(configSecurityIndex);
         }
         return securityInfoInstance.getSecurityRequirementObject(securityIndex);
     }
-    public SecurityRequirementObject getSecurityRequirementObject(PetPostSecurityInfo. @Nullable SecurityIndex securityIndex) throws UnsetPropertyException {
+    public SecurityRequirementObject getSecurityRequirementObject(FakemultiplesecuritiesGetSecurityInfo. @Nullable SecurityIndex securityIndex) {
+        var securityInfoInstance = securityInfo.fakemultiplesecuritiesGetSecurityInfo;
+        if (securityIndex == null) {
+            FakemultiplesecuritiesGetSecurityInfo.SecurityIndex configSecurityIndex = securityIndexInfo.fakemultiplesecuritiesGetSecurityInfoSecurityIndex;
+            return securityInfoInstance.getSecurityRequirementObject(configSecurityIndex);
+        }
+        return securityInfoInstance.getSecurityRequirementObject(securityIndex);
+    }
+    public SecurityRequirementObject getSecurityRequirementObject(FakepetiduploadimagewithrequiredfilePostSecurityInfo. @Nullable SecurityIndex securityIndex) {
+        var securityInfoInstance = securityInfo.fakepetiduploadimagewithrequiredfilePostSecurityInfo;
+        if (securityIndex == null) {
+            FakepetiduploadimagewithrequiredfilePostSecurityInfo.SecurityIndex configSecurityIndex = securityIndexInfo.fakepetiduploadimagewithrequiredfilePostSecurityInfoSecurityIndex;
+            return securityInfoInstance.getSecurityRequirementObject(configSecurityIndex);
+        }
+        return securityInfoInstance.getSecurityRequirementObject(securityIndex);
+    }
+    public SecurityRequirementObject getSecurityRequirementObject(PetPostSecurityInfo. @Nullable SecurityIndex securityIndex) {
         var securityInfoInstance = securityInfo.petPostSecurityInfo;
         if (securityIndex == null) {
-            PetPostSecurityInfo. @Nullable SecurityIndex configSecurityIndex = securityIndexInfo.petPostSecurityInfoSecurityIndex;
-            if (configSecurityIndex == null) {
-                throw new UnsetPropertyException("petPostSecurityInfoSecurityIndex is unset");
-            }
+            PetPostSecurityInfo.SecurityIndex configSecurityIndex = securityIndexInfo.petPostSecurityInfoSecurityIndex;
             return securityInfoInstance.getSecurityRequirementObject(configSecurityIndex);
         }
         return securityInfoInstance.getSecurityRequirementObject(securityIndex);
     }
-    public SecurityRequirementObject getSecurityRequirementObject(PetPutSecurityInfo. @Nullable SecurityIndex securityIndex) throws UnsetPropertyException {
+    public SecurityRequirementObject getSecurityRequirementObject(PetPutSecurityInfo. @Nullable SecurityIndex securityIndex) {
         var securityInfoInstance = securityInfo.petPutSecurityInfo;
         if (securityIndex == null) {
-            PetPutSecurityInfo. @Nullable SecurityIndex configSecurityIndex = securityIndexInfo.petPutSecurityInfoSecurityIndex;
-            if (configSecurityIndex == null) {
-                throw new UnsetPropertyException("petPutSecurityInfoSecurityIndex is unset");
-            }
+            PetPutSecurityInfo.SecurityIndex configSecurityIndex = securityIndexInfo.petPutSecurityInfoSecurityIndex;
             return securityInfoInstance.getSecurityRequirementObject(configSecurityIndex);
         }
         return securityInfoInstance.getSecurityRequirementObject(securityIndex);
     }
-    public SecurityRequirementObject getSecurityRequirementObject(PetfindbystatusGetSecurityInfo. @Nullable SecurityIndex securityIndex) throws UnsetPropertyException {
+    public SecurityRequirementObject getSecurityRequirementObject(PetfindbystatusGetSecurityInfo. @Nullable SecurityIndex securityIndex) {
         var securityInfoInstance = securityInfo.petfindbystatusGetSecurityInfo;
         if (securityIndex == null) {
-            PetfindbystatusGetSecurityInfo. @Nullable SecurityIndex configSecurityIndex = securityIndexInfo.petfindbystatusGetSecurityInfoSecurityIndex;
-            if (configSecurityIndex == null) {
-                throw new UnsetPropertyException("petfindbystatusGetSecurityInfoSecurityIndex is unset");
-            }
+            PetfindbystatusGetSecurityInfo.SecurityIndex configSecurityIndex = securityIndexInfo.petfindbystatusGetSecurityInfoSecurityIndex;
             return securityInfoInstance.getSecurityRequirementObject(configSecurityIndex);
         }
         return securityInfoInstance.getSecurityRequirementObject(securityIndex);
     }
-    public SecurityRequirementObject getSecurityRequirementObject(PetfindbytagsGetSecurityInfo. @Nullable SecurityIndex securityIndex) throws UnsetPropertyException {
+    public SecurityRequirementObject getSecurityRequirementObject(PetfindbytagsGetSecurityInfo. @Nullable SecurityIndex securityIndex) {
         var securityInfoInstance = securityInfo.petfindbytagsGetSecurityInfo;
         if (securityIndex == null) {
-            PetfindbytagsGetSecurityInfo. @Nullable SecurityIndex configSecurityIndex = securityIndexInfo.petfindbytagsGetSecurityInfoSecurityIndex;
-            if (configSecurityIndex == null) {
-                throw new UnsetPropertyException("petfindbytagsGetSecurityInfoSecurityIndex is unset");
-            }
+            PetfindbytagsGetSecurityInfo.SecurityIndex configSecurityIndex = securityIndexInfo.petfindbytagsGetSecurityInfoSecurityIndex;
             return securityInfoInstance.getSecurityRequirementObject(configSecurityIndex);
         }
         return securityInfoInstance.getSecurityRequirementObject(securityIndex);
     }
-    public SecurityRequirementObject getSecurityRequirementObject(PetpetidDeleteSecurityInfo. @Nullable SecurityIndex securityIndex) throws UnsetPropertyException {
+    public SecurityRequirementObject getSecurityRequirementObject(PetpetidDeleteSecurityInfo. @Nullable SecurityIndex securityIndex) {
         var securityInfoInstance = securityInfo.petpetidDeleteSecurityInfo;
         if (securityIndex == null) {
-            PetpetidDeleteSecurityInfo. @Nullable SecurityIndex configSecurityIndex = securityIndexInfo.petpetidDeleteSecurityInfoSecurityIndex;
-            if (configSecurityIndex == null) {
-                throw new UnsetPropertyException("petpetidDeleteSecurityInfoSecurityIndex is unset");
-            }
+            PetpetidDeleteSecurityInfo.SecurityIndex configSecurityIndex = securityIndexInfo.petpetidDeleteSecurityInfoSecurityIndex;
             return securityInfoInstance.getSecurityRequirementObject(configSecurityIndex);
         }
         return securityInfoInstance.getSecurityRequirementObject(securityIndex);
     }
-    public SecurityRequirementObject getSecurityRequirementObject(PetpetidGetSecurityInfo. @Nullable SecurityIndex securityIndex) throws UnsetPropertyException {
+    public SecurityRequirementObject getSecurityRequirementObject(PetpetidGetSecurityInfo. @Nullable SecurityIndex securityIndex) {
         var securityInfoInstance = securityInfo.petpetidGetSecurityInfo;
         if (securityIndex == null) {
-            PetpetidGetSecurityInfo. @Nullable SecurityIndex configSecurityIndex = securityIndexInfo.petpetidGetSecurityInfoSecurityIndex;
-            if (configSecurityIndex == null) {
-                throw new UnsetPropertyException("petpetidGetSecurityInfoSecurityIndex is unset");
-            }
+            PetpetidGetSecurityInfo.SecurityIndex configSecurityIndex = securityIndexInfo.petpetidGetSecurityInfoSecurityIndex;
             return securityInfoInstance.getSecurityRequirementObject(configSecurityIndex);
         }
         return securityInfoInstance.getSecurityRequirementObject(securityIndex);
     }
-    public SecurityRequirementObject getSecurityRequirementObject(PetpetidPostSecurityInfo. @Nullable SecurityIndex securityIndex) throws UnsetPropertyException {
+    public SecurityRequirementObject getSecurityRequirementObject(PetpetidPostSecurityInfo. @Nullable SecurityIndex securityIndex) {
         var securityInfoInstance = securityInfo.petpetidPostSecurityInfo;
         if (securityIndex == null) {
-            PetpetidPostSecurityInfo. @Nullable SecurityIndex configSecurityIndex = securityIndexInfo.petpetidPostSecurityInfoSecurityIndex;
-            if (configSecurityIndex == null) {
-                throw new UnsetPropertyException("petpetidPostSecurityInfoSecurityIndex is unset");
-            }
+            PetpetidPostSecurityInfo.SecurityIndex configSecurityIndex = securityIndexInfo.petpetidPostSecurityInfoSecurityIndex;
             return securityInfoInstance.getSecurityRequirementObject(configSecurityIndex);
         }
         return securityInfoInstance.getSecurityRequirementObject(securityIndex);
     }
-    public SecurityRequirementObject getSecurityRequirementObject(PetpetiduploadimagePostSecurityInfo. @Nullable SecurityIndex securityIndex) throws UnsetPropertyException {
+    public SecurityRequirementObject getSecurityRequirementObject(PetpetiduploadimagePostSecurityInfo. @Nullable SecurityIndex securityIndex) {
         var securityInfoInstance = securityInfo.petpetiduploadimagePostSecurityInfo;
         if (securityIndex == null) {
-            PetpetiduploadimagePostSecurityInfo. @Nullable SecurityIndex configSecurityIndex = securityIndexInfo.petpetiduploadimagePostSecurityInfoSecurityIndex;
-            if (configSecurityIndex == null) {
-                throw new UnsetPropertyException("petpetiduploadimagePostSecurityInfoSecurityIndex is unset");
-            }
+            PetpetiduploadimagePostSecurityInfo.SecurityIndex configSecurityIndex = securityIndexInfo.petpetiduploadimagePostSecurityInfoSecurityIndex;
             return securityInfoInstance.getSecurityRequirementObject(configSecurityIndex);
         }
         return securityInfoInstance.getSecurityRequirementObject(securityIndex);
     }
-    public SecurityRequirementObject getSecurityRequirementObject(StoreinventoryGetSecurityInfo. @Nullable SecurityIndex securityIndex) throws UnsetPropertyException {
+    public SecurityRequirementObject getSecurityRequirementObject(StoreinventoryGetSecurityInfo. @Nullable SecurityIndex securityIndex) {
         var securityInfoInstance = securityInfo.storeinventoryGetSecurityInfo;
         if (securityIndex == null) {
-            StoreinventoryGetSecurityInfo. @Nullable SecurityIndex configSecurityIndex = securityIndexInfo.storeinventoryGetSecurityInfoSecurityIndex;
-            if (configSecurityIndex == null) {
-                throw new UnsetPropertyException("storeinventoryGetSecurityInfoSecurityIndex is unset");
-            }
+            StoreinventoryGetSecurityInfo.SecurityIndex configSecurityIndex = securityIndexInfo.storeinventoryGetSecurityInfoSecurityIndex;
             return securityInfoInstance.getSecurityRequirementObject(configSecurityIndex);
         }
         return securityInfoInstance.getSecurityRequirementObject(securityIndex);
@@ -374,10 +491,10 @@ public class ApiConfiguration {
     }
 
     public Map<String, List< String>> getDefaultHeaders() {
-        return new HashMap<>();
+        return defaultHeaders;
     }
 
-    public@Nullable Duration getTimeout() {
+    public @Nullable Duration getTimeout() {
         return timeout;
     }
 }

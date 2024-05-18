@@ -1,5 +1,3 @@
-{{> _helper_header }}
-
 {{#with requestBody}}
 package {{packageName}}.{{subpackage}};
 
@@ -12,6 +10,7 @@ public class {{jsonPathPiece.pascalCase}} extends {{refInfo.refModule}} {
     public static class {{jsonPathPiece.pascalCase}}1 extends {{refInfo.refModule}}1 {}
 }
 {{else}}
+import {{packageName}}.exceptions.NotImplementedException;
 import {{packageName}}.requestbody.RequestBodySerializer;
 import {{packageName}}.requestbody.GenericRequestBody;
 import {{packageName}}.requestbody.SerializedRequestBody;
@@ -54,7 +53,7 @@ public class {{jsonPathPiece.pascalCase}} {
             );
         }
 
-        public SerializedRequestBody serialize(SealedRequestBody requestBody) {
+        public SerializedRequestBody serialize(SealedRequestBody requestBody) throws NotImplementedException  {
     {{#eq content.size 1}}
         {{#each content}}
             {{@key.pascalCase}}RequestBody requestBody{{@index}} = ({{@key.pascalCase}}RequestBody) requestBody;

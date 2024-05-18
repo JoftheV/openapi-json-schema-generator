@@ -3400,6 +3400,11 @@ components:
           type: string
         b:
           type: number
+        ArrayProperty:
+          items:
+            $ref: '#/components/schemas/EnumClass'
+          type: array
+          nullable: true
       additionalProperties: false
     ObjectWithNonIntersectingValues:
       properties:
@@ -3444,3 +3449,27 @@ components:
       exclusiveMinimum: true
       maximum: 12
       exclusiveMaximum: true
+    MultiPropertiesSchema:
+      properties:
+        status:
+          type: integer
+          format: int32
+        data:
+          items:
+            $ref: '#/components/schemas/ItemsSchema'
+          type: array
+        message:
+          type: string
+      type: object
+      required:
+        - status
+      additionalProperties: false
+    ItemsSchema:
+      type: object
+      properties:
+        name:
+          type: string
+        someProperty:
+          type: string
+        secondAdditionalProperty:
+          type: string

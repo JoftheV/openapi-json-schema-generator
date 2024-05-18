@@ -18,11 +18,11 @@ public class TypeValidatorTest {
     }
 
     @Test
-    public void testValidateSucceeds() {
+    public void testValidateSucceeds() throws ValidationException {
         final TypeValidator validator = new TypeValidator();
         ValidationMetadata validationMetadata = new ValidationMetadata(
                 new ArrayList<>(),
-                new SchemaConfiguration(JsonSchemaKeywordFlags.ofNone()),
+                new SchemaConfiguration(new JsonSchemaKeywordFlags.Builder().build()),
                 new PathToSchemasMap(),
                 new LinkedHashSet<>()
         );
@@ -41,7 +41,7 @@ public class TypeValidatorTest {
         final TypeValidator validator = new TypeValidator();
         ValidationMetadata validationMetadata = new ValidationMetadata(
                 new ArrayList<>(),
-                new SchemaConfiguration(JsonSchemaKeywordFlags.ofNone()),
+                new SchemaConfiguration(new JsonSchemaKeywordFlags.Builder().build()),
                 new PathToSchemasMap(),
                 new LinkedHashSet<>()
         );

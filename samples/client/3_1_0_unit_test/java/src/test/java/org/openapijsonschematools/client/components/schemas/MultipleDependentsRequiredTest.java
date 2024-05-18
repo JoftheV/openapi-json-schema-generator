@@ -5,7 +5,6 @@ import org.junit.Test;
 import org.openapijsonschematools.client.configurations.JsonSchemaKeywordFlags;
 import org.openapijsonschematools.client.configurations.SchemaConfiguration;
 import org.openapijsonschematools.client.exceptions.ValidationException;
-import org.openapijsonschematools.client.exceptions.InvalidTypeException;
 import org.openapijsonschematools.client.schemas.validation.MapUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
@@ -15,10 +14,10 @@ import java.util.Map;
 import java.util.AbstractMap;
 
 public class MultipleDependentsRequiredTest {
-    static final SchemaConfiguration configuration = new SchemaConfiguration(JsonSchemaKeywordFlags.onlyFormat());
+    static final SchemaConfiguration configuration = new SchemaConfiguration(new JsonSchemaKeywordFlags.Builder().format().build());
 
     @Test
-    public void testNondependantsPasses() {
+    public void testNondependantsPasses() throws ValidationException {
         // nondependants
         final var schema = MultipleDependentsRequired.MultipleDependentsRequired1.getInstance();
         schema.validate(
@@ -55,13 +54,13 @@ public class MultipleDependentsRequiredTest {
                 configuration
             );
             throw new RuntimeException("A different exception must be thrown");
-        } catch (ValidationException | InvalidTypeException ignored) {
+        } catch (ValidationException ignored) {
             ;
         }
     }
 
     @Test
-    public void testWithDependenciesPasses() {
+    public void testWithDependenciesPasses() throws ValidationException {
         // with dependencies
         final var schema = MultipleDependentsRequired.MultipleDependentsRequired1.getInstance();
         schema.validate(
@@ -98,7 +97,7 @@ public class MultipleDependentsRequiredTest {
                 configuration
             );
             throw new RuntimeException("A different exception must be thrown");
-        } catch (ValidationException | InvalidTypeException ignored) {
+        } catch (ValidationException ignored) {
             ;
         }
     }
@@ -122,13 +121,13 @@ public class MultipleDependentsRequiredTest {
                 configuration
             );
             throw new RuntimeException("A different exception must be thrown");
-        } catch (ValidationException | InvalidTypeException ignored) {
+        } catch (ValidationException ignored) {
             ;
         }
     }
 
     @Test
-    public void testNeitherPasses() {
+    public void testNeitherPasses() throws ValidationException {
         // neither
         final var schema = MultipleDependentsRequired.MultipleDependentsRequired1.getInstance();
         schema.validate(

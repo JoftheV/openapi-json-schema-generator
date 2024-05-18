@@ -5,9 +5,9 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.openapijsonschematools.client.configurations.JsonSchemaKeywordFlags;
 import org.openapijsonschematools.client.configurations.SchemaConfiguration;
+import org.openapijsonschematools.client.exceptions.ValidationException;
 import org.openapijsonschematools.client.schemas.validation.JsonSchema;
 import org.openapijsonschematools.client.schemas.validation.FrozenMap;
-import org.openapijsonschematools.client.exceptions.ValidationException;
 import org.openapijsonschematools.client.schemas.validation.PathToSchemasMap;
 import org.openapijsonschematools.client.schemas.validation.ValidationMetadata;
 
@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.Map;
 
 public class MapSchemaTest {
-    static final SchemaConfiguration configuration = new SchemaConfiguration(JsonSchemaKeywordFlags.ofNone());
+    static final SchemaConfiguration configuration = new SchemaConfiguration(new JsonSchemaKeywordFlags.Builder().build());
     static final MapJsonSchema.MapJsonSchema1 mapJsonSchema = MapJsonSchema.MapJsonSchema1.getInstance();
     static final ValidationMetadata validationMetadata = new ValidationMetadata(
             List.of("args[0"),
@@ -37,7 +37,7 @@ public class MapSchemaTest {
     }
 
     @Test
-    public void testValidateMap() {
+    public void testValidateMap() throws ValidationException {
         Map<String, Object> inMap = new LinkedHashMap<>();
         inMap.put("today", LocalDate.of(2017, 7, 21));
         FrozenMap<@Nullable Object> validatedValue = mapJsonSchema.validate(inMap, configuration);

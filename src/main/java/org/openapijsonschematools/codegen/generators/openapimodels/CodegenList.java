@@ -6,20 +6,18 @@ import java.util.List;
 /**
  * A class to store inline codegenschema definitions
  */
-public class CodegenList <T> extends AbstractList<T> implements OperationInputProvider {
+public class CodegenList <T> extends AbstractList<T> implements OperationInputProvider, Comparable<CodegenList> {
     public final List<T> items;
     public final CodegenKey jsonPathPiece;
     public final String subpackage;
-    public final List<MapBuilder<T>> builders;
     public final CodegenKey operationInputClassName;
     public final String operationInputVariableName;
     public final String pathFromDocRoot;
 
-    public CodegenList(List<T> items, CodegenKey jsonPathPiece, String subpackage, List<MapBuilder<T>> builders, CodegenKey operationInputClassName, String operationInputVariableName, String pathFromDocRoot) {
+    public CodegenList(List<T> items, CodegenKey jsonPathPiece, String subpackage, CodegenKey operationInputClassName, String operationInputVariableName, String pathFromDocRoot) {
         this.items = items;
         this.jsonPathPiece = jsonPathPiece;
         this.subpackage = subpackage;
-        this.builders = builders;
         this.operationInputClassName = operationInputClassName;
         this.operationInputVariableName = operationInputVariableName;
         this.pathFromDocRoot = pathFromDocRoot;
@@ -48,5 +46,10 @@ public class CodegenList <T> extends AbstractList<T> implements OperationInputPr
     @Override
     public String pathFromDocRoot() {
         return pathFromDocRoot;
+    }
+
+    @Override
+    public int compareTo(CodegenList o) {
+        return jsonPathPiece.pascalCase.compareTo(o.jsonPathPiece.pascalCase);
     }
 }

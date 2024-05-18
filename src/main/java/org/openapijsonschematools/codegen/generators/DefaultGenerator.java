@@ -25,7 +25,6 @@ import com.github.curiousoddman.rgxgen.config.RgxGenOption;
 import com.github.curiousoddman.rgxgen.config.RgxGenProperties;
 import com.google.common.collect.ImmutableMap;
 import com.samskivert.mustache.Mustache;
-import com.samskivert.mustache.Mustache.Compiler;
 import com.samskivert.mustache.Mustache.Lambda;
 
 import io.swagger.v3.oas.models.Components;
@@ -38,6 +37,8 @@ import io.swagger.v3.oas.models.security.SecurityRequirement;
 import org.apache.commons.text.StringEscapeUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.tuple.Pair;
+import org.openapijsonschematools.codegen.config.GeneratorSettings;
+import org.openapijsonschematools.codegen.config.WorkflowSettings;
 import org.openapijsonschematools.codegen.generators.models.CliOption;
 import org.openapijsonschematools.codegen.common.CodegenConstants;
 import org.openapijsonschematools.codegen.config.GlobalSettings;
@@ -47,6 +48,7 @@ import org.openapijsonschematools.codegen.generators.generatormetadata.features.
 import org.openapijsonschematools.codegen.generators.generatormetadata.features.GlobalFeature;
 import org.openapijsonschematools.codegen.generators.generatormetadata.features.SchemaFeature;
 import org.openapijsonschematools.codegen.generators.generatormetadata.features.WireFormatFeature;
+import org.openapijsonschematools.codegen.generators.models.CodeGeneratorSettings;
 import org.openapijsonschematools.codegen.generators.models.VendorExtension;
 import org.openapijsonschematools.codegen.generators.openapimodels.ArrayListWithContext;
 import org.openapijsonschematools.codegen.generators.openapimodels.CodegenCallback;
@@ -54,6 +56,7 @@ import org.openapijsonschematools.codegen.generators.openapimodels.CodegenDiscri
 import org.openapijsonschematools.codegen.generators.openapimodels.CodegenEncoding;
 import org.openapijsonschematools.codegen.generators.openapimodels.CodegenHeader;
 import org.openapijsonschematools.codegen.generators.openapimodels.CodegenKey;
+import org.openapijsonschematools.codegen.generators.openapimodels.CodegenKeyType;
 import org.openapijsonschematools.codegen.generators.openapimodels.CodegenMap;
 import org.openapijsonschematools.codegen.generators.openapimodels.CodegenMediaType;
 import org.openapijsonschematools.codegen.generators.openapimodels.CodegenOauthFlow;
@@ -77,15 +80,16 @@ import org.openapijsonschematools.codegen.generators.openapimodels.CodegenText;
 import org.openapijsonschematools.codegen.generators.openapimodels.CodegenXml;
 import org.openapijsonschematools.codegen.generators.openapimodels.EnumInfo;
 import org.openapijsonschematools.codegen.generators.openapimodels.EnumValue;
+import org.openapijsonschematools.codegen.generators.models.GeneratedFileType;
 import org.openapijsonschematools.codegen.generators.openapimodels.LinkedHashMapWithContext;
 import org.openapijsonschematools.codegen.generators.openapimodels.MapBuilder;
 import org.openapijsonschematools.codegen.generators.openapimodels.PairCacheKey;
 import org.openapijsonschematools.codegen.generators.openapimodels.ParameterCollection;
+import org.openapijsonschematools.codegen.generators.models.ReportFileType;
 import org.openapijsonschematools.codegen.generators.openapimodels.SchemaTestCase;
 import org.openapijsonschematools.codegen.templating.SupportingFile;
 import org.openapijsonschematools.codegen.common.SerializerUtils;
 import org.openapijsonschematools.codegen.templating.TemplatingEngineLoader;
-import org.openapijsonschematools.codegen.templating.mustache.CamelCaseLambda;
 import org.openapijsonschematools.codegen.templating.mustache.IndentedLambda;
 import org.openapijsonschematools.codegen.templating.mustache.LowercaseLambda;
 import org.openapijsonschematools.codegen.templating.mustache.SnakecaseLambda;
@@ -107,7 +111,6 @@ import java.util.*;
 import java.util.Map.Entry;
 import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.concurrent.TimeUnit;
-import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -127,12 +130,58 @@ import io.swagger.v3.oas.models.security.SecurityScheme;
 import io.swagger.v3.oas.models.servers.Server;
 import io.swagger.v3.oas.models.servers.ServerVariable;
 
-import javax.validation.constraints.NotNull;
-
 import static org.openapijsonschematools.codegen.common.StringUtils.camelize;
 
 @SuppressWarnings("rawtypes")
 public class DefaultGenerator implements Generator {
+    protected CodeGeneratorSettings generatorSettings;
+    protected static final List<String> defaultPostGenerationMsg = List.of(
+        "################################################################################",
+        "# Thanks for using OpenAPI JSON Schema Generator.                              #",
+        "# Please consider donation to help us maintain this project \uD83D\uDE4F                 #",
+        "# https://github.com/sponsors/spacether                                        #",
+        "################################################################################"
+    );
+
+    private static Map<String, Object> getInitialAdditionalProperties(GeneratorSettings generatorSettings, CodeGeneratorSettings codeGeneratorSettings) {
+        Map<String, Object> initialAddProps = new HashMap<>();
+        if (generatorSettings != null) {
+            initialAddProps.putAll(generatorSettings.getAdditionalProperties());
+        }
+        initialAddProps.put(CodegenConstants.HIDE_GENERATION_TIMESTAMP, codeGeneratorSettings.hideGenerationTimestamp);
+        initialAddProps.put(CodegenConstants.TEMPLATING_ENGINE, codeGeneratorSettings.templateEngineName);
+        if (codeGeneratorSettings.templateDir != null) {
+            initialAddProps.put(CodegenConstants.TEMPLATE_DIR, codeGeneratorSettings.templateDir);
+        }
+        return initialAddProps;
+    }
+
+    protected DefaultGenerator(GeneratorSettings generatorSettings, WorkflowSettings workflowSettings, String embeddedTemplateDir, String packageNameDefault, String artifactIdDefault, String outputFolderDefault) {
+        this.generatorSettings = CodeGeneratorSettings.of(generatorSettings, workflowSettings, embeddedTemplateDir, packageNameDefault, artifactIdDefault, outputFolderDefault);
+        additionalProperties = getInitialAdditionalProperties(generatorSettings, this.generatorSettings);
+
+        // name formatting options
+        cliOptions.add(CliOption.newBoolean(CodegenConstants.ALLOW_UNICODE_IDENTIFIERS, CodegenConstants
+            .ALLOW_UNICODE_IDENTIFIERS_DESC).defaultValue(Boolean.FALSE.toString()));
+
+        // initialize special character mapping
+        initializeSpecialCharacterMapping();
+
+        // Register common Mustache lambdas.
+        registerMustacheLambdas();
+    }
+
+    public DefaultGenerator(GeneratorSettings generatorSettings, WorkflowSettings workflowSettings) {
+        this(
+            generatorSettings,
+            workflowSettings,
+            "java",
+            "openapiclient",
+            "openapiclient",
+            "generated-code" + File.separator + "java"
+        );
+    }
+
     private final Logger LOGGER = LoggerFactory.getLogger(DefaultGenerator.class);
 
     public static FeatureSet DefaultFeatureSet;
@@ -150,12 +199,9 @@ public class DefaultGenerator implements Generator {
     protected String requestBodyIdentifier = "request_body";
     private final Pattern patternRegex = Pattern.compile("^/?(.+?)/?([simu]{0,4})$");
     private final CodegenKey additionalPropertySampleKey = new CodegenKey("someAdditionalProperty", true, "additional_property", "AdditionalProperty", "additional-property", "additionalProperty");
-
-
-
-    protected String templateEngineName;
     protected String headersSchemaFragment = "Headers";
     protected static final Set<String> operationVerbs = Set.of("get", "put", "post", "delete", "options", "head", "patch", "trace");
+    protected Set<String> xParameters = Set.of("PathParameters", "QueryParameters", "HeaderParameters", "CookieParameters");
 
     static {
         DefaultFeatureSet = FeatureSet.newBuilder()
@@ -199,25 +245,27 @@ public class DefaultGenerator implements Generator {
         falseSchema.setNot(new Schema());
     }
 
-    protected GeneratorMetadata generatorMetadata;
+    public static final GeneratorMetadata generatorMetadata = GeneratorMetadata.newBuilder()
+        .name("java")
+        .language(GeneratorLanguage.JAVA)
+        .languageVersion("17")
+        .type(GeneratorType.CLIENT)
+        .stability(Stability.EXPERIMENTAL)
+        .featureSet(DefaultFeatureSet)
+        .generationMessage("OpenAPI JSON Schema Generator: java "+GeneratorType.CLIENT.toValue())
+        .helpMsg("todo replace help text")
+        .postGenerationMsg(defaultPostGenerationMsg)
+        .reservedWords(Set.of())
+        .instantiationTypes(Map.of())
+        .languageSpecificPrimitives(Set.of())
+        .build();
     protected String inputSpec;
-    protected String outputFolder = "";
-    protected Set<String> defaultIncludes;
     protected Map<String, String> typeMapping;
-    // instantiationTypes map from container types only: set, map, and array to the in language-type
-    protected Map<String, String> instantiationTypes;
-    protected Set<String> reservedWords;
-    protected Set<String> languageSpecificPrimitives = new HashSet<>();
-    // a map to store the mapping between a schema and the new one
-    // a map to store the mapping between inline schema and the name provided by the user
-    protected String modelPackage = "components.schema", apiPackage = "";
+    protected String modelPackage = "components.schema";
     protected String modelNamePrefix = "", modelNameSuffix = "";
     protected String apiNamePrefix = "", apiNameSuffix = "Api";
     protected String filesMetadataFilename = "FILES";
     protected String versionMetadataFilename = "VERSION";
-
-    protected String packageName = "src.main.java";
-
     protected String docsFolder = "docs";
     // for writing api files
     protected HashMap<CodegenConstants.JSON_PATH_LOCATION_TYPE, HashMap<String, String>> jsonPathTemplateFiles = new HashMap<>();
@@ -226,8 +274,6 @@ public class DefaultGenerator implements Generator {
     // for writing test files
     protected HashMap<CodegenConstants.JSON_PATH_LOCATION_TYPE, HashMap<String, String>> jsonPathTestTemplateFiles = new HashMap<>();
 
-    protected String templateDir;
-    protected String embeddedTemplateDir;
     protected Map<String, Object> additionalProperties = new HashMap<>();
     protected Map<String, Object> vendorExtensions = new HashMap<>();
     /*
@@ -236,11 +282,8 @@ public class DefaultGenerator implements Generator {
     */
     protected List<SupportingFile> supportingFiles = new ArrayList<>();
     protected List<CliOption> cliOptions = new ArrayList<>();
-    protected boolean skipOverwrite;
-    protected boolean removeOperationIdPrefix;
     protected String removeOperationIdPrefixDelimiter = "_";
     protected int removeOperationIdPrefixCount = 1;
-    protected boolean skipOperationExample;
 
     private static final Pattern COMMON_PREFIX_ENUM_NAME = Pattern.compile("[a-zA-Z\\d]+\\z");
 
@@ -266,7 +309,6 @@ public class DefaultGenerator implements Generator {
      */
     protected boolean supportsAdditionalPropertiesWithComposedSchema = true;
     protected Boolean allowUnicodeIdentifiers = false;
-    protected Boolean hideGenerationTimestamp = true;
     // How to encode special characters like $
     // They are translated to words like "Dollar" and prefixed with '
     // Then translated back during JSON encoding and decoding
@@ -277,11 +319,6 @@ public class DefaultGenerator implements Generator {
     // flag to indicate whether to use environment variable to post process file
     protected boolean enablePostProcessFile = false;
 
-    // flag to indicate whether to only update files whose contents have changed
-    protected boolean enableMinimalUpdate = false;
-
-    // acts strictly upon a spec, potentially modifying it to have consistent behavior across generators.
-    protected boolean strictSpecBehavior = true;
     // flag to indicate whether enum value prefixes are removed
     protected boolean removeEnumValuePrefix = true;
 
@@ -314,24 +351,6 @@ public class DefaultGenerator implements Generator {
 
     @Override
     public void processOpts() {
-        if (this.templateEngineName == null && additionalProperties.containsKey(CodegenConstants.TEMPLATING_ENGINE)) {
-            setTemplateEngineName((String) additionalProperties.get(CodegenConstants.TEMPLATING_ENGINE));
-        }
-
-        if (additionalProperties.containsKey(CodegenConstants.TEMPLATE_DIR)) {
-            this.setTemplateDir((String) additionalProperties.get(CodegenConstants.TEMPLATE_DIR));
-        }
-
-        if (additionalProperties.containsKey(CodegenConstants.API_PACKAGE)) {
-            this.setApiPackage((String) additionalProperties.get(CodegenConstants.API_PACKAGE));
-        }
-
-        if (additionalProperties.containsKey(CodegenConstants.HIDE_GENERATION_TIMESTAMP)) {
-            setHideGenerationTimestamp(convertPropertyToBooleanAndWriteBack(CodegenConstants.HIDE_GENERATION_TIMESTAMP));
-        } else {
-            additionalProperties.put(CodegenConstants.HIDE_GENERATION_TIMESTAMP, hideGenerationTimestamp);
-        }
-
         if (additionalProperties.containsKey(CodegenConstants.ALLOW_UNICODE_IDENTIFIERS)) {
             this.setAllowUnicodeIdentifiers(Boolean.valueOf(additionalProperties
                     .get(CodegenConstants.ALLOW_UNICODE_IDENTIFIERS).toString()));
@@ -353,11 +372,6 @@ public class DefaultGenerator implements Generator {
             this.setModelNameSuffix((String) additionalProperties.get(CodegenConstants.MODEL_NAME_SUFFIX));
         }
 
-        if (additionalProperties.containsKey(CodegenConstants.REMOVE_OPERATION_ID_PREFIX)) {
-            this.setRemoveOperationIdPrefix(Boolean.parseBoolean(additionalProperties
-                    .get(CodegenConstants.REMOVE_OPERATION_ID_PREFIX).toString()));
-        }
-
         if (additionalProperties.containsKey(CodegenConstants.REMOVE_OPERATION_ID_PREFIX_DELIMITER)) {
             this.setRemoveOperationIdPrefixDelimiter(additionalProperties
                     .get(CodegenConstants.REMOVE_OPERATION_ID_PREFIX_DELIMITER).toString());
@@ -368,28 +382,12 @@ public class DefaultGenerator implements Generator {
                     .get(CodegenConstants.REMOVE_OPERATION_ID_PREFIX_COUNT).toString()));
         }
 
-        if (additionalProperties.containsKey(CodegenConstants.SKIP_OPERATION_EXAMPLE)) {
-            this.setSkipOperationExample(Boolean.parseBoolean(additionalProperties
-                    .get(CodegenConstants.SKIP_OPERATION_EXAMPLE).toString()));
-        }
-
         if (additionalProperties.containsKey(CodegenConstants.DOCEXTENSION)) {
             this.setDocExtension(String.valueOf(additionalProperties
                     .get(CodegenConstants.DOCEXTENSION).toString()));
         }
 
-        if (additionalProperties.containsKey(CodegenConstants.ENABLE_POST_PROCESS_FILE)) {
-            this.setEnablePostProcessFile(Boolean.parseBoolean(additionalProperties
-                    .get(CodegenConstants.ENABLE_POST_PROCESS_FILE).toString()));
-        }
-
-        if (additionalProperties.containsKey(CodegenConstants.REMOVE_ENUM_VALUE_PREFIX)) {
-            this.setRemoveEnumValuePrefix(Boolean.parseBoolean(additionalProperties
-                    .get(CodegenConstants.REMOVE_ENUM_VALUE_PREFIX).toString()));
-        }
-
         requiredAddPropUnsetSchema = fromSchema(new JsonSchema(), null, null);
-
     }
 
     /***
@@ -411,8 +409,6 @@ public class DefaultGenerator implements Generator {
                 .put("uppercase", new UppercaseLambda())
                 .put("snakecase", new SnakecaseLambda())
                 .put("titlecase", new TitlecaseLambda())
-                .put("camelcase", new CamelCaseLambda(true).generator(this))
-                .put("pascalcase", new CamelCaseLambda(false).generator(this))
                 .put("indented", new IndentedLambda())
                 .put("indented_8", new IndentedLambda(8, " "))
                 .put("indented_12", new IndentedLambda(12, " "))
@@ -455,14 +451,8 @@ public class DefaultGenerator implements Generator {
         return modelNameToSchemaCache;
     }
 
-    @Override
-    public String packageName() {
-        // used to generate imports
-        return packageName;
-    }
-
     public String packagePath() {
-        return packageName.replace('.', File.separatorChar);
+        return generatorSettings.packageName.replace('.', File.separatorChar);
     }
 
     /**
@@ -473,13 +463,6 @@ public class DefaultGenerator implements Generator {
      */
     @Override
     public TreeMap<String, CodegenSchema> updateAllModels(TreeMap<String, CodegenSchema> models) {
-        return models;
-    }
-
-    // override with any special post-processing
-    @Override
-    @SuppressWarnings("static-method")
-    public TreeMap<String, CodegenSchema> postProcessModels(TreeMap<String, CodegenSchema> models) {
         return models;
     }
 
@@ -543,17 +526,6 @@ public class DefaultGenerator implements Generator {
         this.openAPI = openAPI;
     }
 
-    // override with any message to be shown right before the process finishes
-    @Override
-    @SuppressWarnings("static-method")
-    public void postProcess() {
-        LOGGER.info("################################################################################");
-        LOGGER.info("# Thanks for using OpenAPI JSON Schema Generator.                              #");
-        LOGGER.info("# Please consider donation to help us maintain this project \uD83D\uDE4F                 #");
-        LOGGER.info("# https://github.com/sponsors/spacether                                        #");
-        LOGGER.info("################################################################################");
-    }
-
     // override with any special post-processing
     @Override
     @SuppressWarnings("static-method")
@@ -597,13 +569,6 @@ public class DefaultGenerator implements Generator {
     public void processOpenAPI(OpenAPI openAPI) {
     }
 
-    // override with any special handling of the JMustache compiler
-    @Override
-    @SuppressWarnings("unused")
-    public Compiler processCompiler(Compiler compiler) {
-        return compiler;
-    }
-
     // override with any special text escaping logic
     @Override
     @SuppressWarnings("static-method")
@@ -622,32 +587,6 @@ public class DefaultGenerator implements Generator {
                                 StringEscapeUtils.escapeJava(input)
                                         .replace("\\/", "/"))
                         .replaceAll("[\\t\\n\\r]", " ")
-                        .replace("\\", "\\\\")
-                        .replace("\"", "\\\""));
-    }
-
-    /**
-     * Escape characters while allowing new lines
-     *
-     * @param input String to be escaped
-     * @return escaped string
-     */
-    @Override
-    public String escapeTextWhileAllowingNewLines(String input) {
-        if (input == null) {
-            return null;
-        }
-
-        // remove \t
-        // replace \ with \\
-        // replace " with \"
-        // outer unescape to retain the original multibyte characters
-        // finally escalate characters avoiding code injection
-        return escapeUnsafeCharacters(
-                StringEscapeUtils.unescapeJava(
-                                StringEscapeUtils.escapeJava(input)
-                                        .replace("\\/", "/"))
-                        .replaceAll("\\t", " ")
                         .replace("\\", "\\\\")
                         .replace("\"", "\\\""));
     }
@@ -684,64 +623,30 @@ public class DefaultGenerator implements Generator {
     }
 
     @Override
-    public Map<String, String> instantiationTypes() {
-        return instantiationTypes;
+    public HashMap<CodegenConstants.JSON_PATH_LOCATION_TYPE, HashMap<String, String>> getJsonPathTemplateFiles(GeneratedFileType type) {
+        switch (type) {
+            case CODE:
+                return jsonPathTemplateFiles;
+            case DOCUMENTATION:
+                return jsonPathDocTemplateFiles;
+            case TEST:
+                return jsonPathTestTemplateFiles;
+            default:
+                return null;
+        }
     }
 
-    @Override
-    public Set<String> reservedWords() {
-        return reservedWords;
-    }
-
-    @Override
-    public Set<String> languageSpecificPrimitives() {
-        return languageSpecificPrimitives;
-    }
-
-    @Override
+    @Deprecated
     public String modelPackage() {
         return modelPackage;
     }
 
-    @Override
-    public String apiPackage() {
-        return apiPackage;
-    }
+    @Deprecated
+    public String toResponseModuleName(String componentName, String jsonPath) { return getFilename(CodegenKeyType.RESPONSE, componentName, jsonPath); }
 
-    @Override
-    public String templateDir() {
-        return templateDir;
-    }
-
-    @Override
-    public String embeddedTemplateDir() {
-        if (embeddedTemplateDir != null) {
-            return embeddedTemplateDir;
-        } else {
-            return templateDir;
-        }
-    }
-    @Override
-    public HashMap<CodegenConstants.JSON_PATH_LOCATION_TYPE, HashMap<String, String>> jsonPathTemplateFiles() {
-        return jsonPathTemplateFiles;
-    }
-
-    @Override
-    public HashMap<CodegenConstants.JSON_PATH_LOCATION_TYPE, HashMap<String, String>> jsonPathDocTemplateFiles() {
-        return jsonPathDocTemplateFiles;
-    }
-
-    @Override
-    public HashMap<CodegenConstants.JSON_PATH_LOCATION_TYPE, HashMap<String, String>> jsonPathTestTemplateFiles() {
-        return jsonPathTestTemplateFiles;
-    }
-
-    public String toResponseModuleName(String componentName, String jsonPath) { return toModuleFilename(componentName, jsonPath); }
-
-    public String getPascalCaseResponse(String componentName, String jsonPath) { return toModelName(componentName, null); }
-
-    public String toHeaderFilename(String componentName, String jsonPath) { return toModuleFilename(componentName, jsonPath); }
-
+    @Deprecated
+    public String getPascalCaseResponse(String componentName, String jsonPath) { return getPascalCase(CodegenKeyType.RESPONSE, componentName, jsonPath); }
+    
     @Override
     public Map<String, Object> additionalProperties() {
         return additionalProperties;
@@ -753,47 +658,13 @@ public class DefaultGenerator implements Generator {
     }
 
     @Override
+    public CodeGeneratorSettings generatorSettings() {
+        return generatorSettings;
+    }
+
+    @Override
     public List<SupportingFile> supportingFiles() {
         return supportingFiles;
-    }
-
-    @Override
-    public String outputFolder() {
-        return outputFolder;
-    }
-
-    @Override
-    public void setOutputDir(String dir) {
-        this.outputFolder = dir;
-    }
-
-    @Override
-    public String getOutputDir() {
-        return outputFolder();
-    }
-
-    @Override
-    public String getInputSpec() {
-        return inputSpec;
-    }
-
-    @Override
-    public void setInputSpec(String inputSpec) {
-        this.inputSpec = inputSpec;
-    }
-
-    @Override
-    public String getFilesMetadataFilename() {
-        return filesMetadataFilename;
-    }
-
-    @Override
-    public String getVersionMetadataFilename() {
-        return versionMetadataFilename;
-    }
-
-    public void setTemplateDir(String templateDir) {
-        this.templateDir = templateDir;
     }
 
     public void setModelPackage(String modelPackage) {
@@ -814,10 +685,6 @@ public class DefaultGenerator implements Generator {
 
     public void setApiNamePrefix(String apiNamePrefix) {
         this.apiNamePrefix = apiNamePrefix;
-    }
-
-    public void setApiPackage(String apiPackage) {
-        this.apiPackage = apiPackage;
     }
 
     public void setAllowUnicodeIdentifiers(Boolean allowUnicodeIdentifiers) {
@@ -915,51 +782,25 @@ public class DefaultGenerator implements Generator {
     }
 
     @Override
-    public String toContentTypeFilename(String name) {
-        return name;
-    }
-
-    @Override
     public String toModuleFilename(String name, String jsonPath) {
         return org.openapijsonschematools.codegen.common.StringUtils.camelize(name);
     }
 
-    public String toPathFilename(String name, String jsonPath) {
-        return toModuleFilename(name, jsonPath);
-    }
-
-    @Override
-    public String toParameterFilename(String basename, String jsonPath) {
-        return toModuleFilename(basename, jsonPath);
-    }
-
-    @Override
-    public String toOperationFilename(String name, String jsonPath) {
-        return name;
-    }
-
-    @Override
-    public String toSecuritySchemeFilename(String basename, String jsonPath) {
-        return toModuleFilename(basename, jsonPath);
-    }
-
-    @Override
-    public String toServerFilename(String basename, String jsonPath) {
-        return toModuleFilename(basename, jsonPath);
-    }
-
-    @Override
-    public String toSecurityFilename(String basename, String jsonPath) {
-        return toModuleFilename(basename, jsonPath);
-    }
-
-    @Override
-    public String getPascalCaseServer(String basename, String jsonPath) {
-        return "Server" + basename;
-    }
-
+    @Deprecated
     public String getPascalCaseParameter(String basename, String jsonPath) {
-        return toModelName(basename, null);
+        return getPascalCase(CodegenKeyType.PARAMETER, basename, null);
+    }
+
+    @Override
+    public String getReportFilename(ReportFileType type) {
+        switch (type) {
+            case FILES:
+                return filesMetadataFilename;
+            case VERSION:
+                return versionMetadataFilename;
+            default:
+                return null;
+        }
     }
 
     /**
@@ -980,7 +821,7 @@ public class DefaultGenerator implements Generator {
      * @return the sanitized variable name
      */
     public String toVarName(final String name) {
-        if (reservedWords.contains(name)) {
+        if (getGeneratorMetadata().getReservedWords().contains(name)) {
             return escapeReservedWord(name);
         } else if (name.chars().anyMatch(character -> specialCharReplacements.containsKey(String.valueOf((char) character)))) {
             return org.openapijsonschematools.codegen.common.StringUtils.escape(name, specialCharReplacements, null, null);
@@ -988,6 +829,7 @@ public class DefaultGenerator implements Generator {
         return name;
     }
 
+    @Deprecated
     /**
      * Return the parameter name by removing invalid characters and proper escaping if
      * it's a reserved word.
@@ -997,8 +839,14 @@ public class DefaultGenerator implements Generator {
      */
     @Override
     public String toParamName(String name) {
-        name = removeNonNameElementToCamelCase(name); // FIXME: a parameter should not be assigned. Also declare the methods parameters as 'final'.
-        if (reservedWords.contains(name)) {
+        String result = Arrays.stream(name.split("[-_:;#" + removeOperationIdPrefixDelimiter + "]"))
+                .map(StringUtils::capitalize)
+                .collect(Collectors.joining(""));
+        if (!result.isEmpty()) {
+            result = result.substring(0, 1).toLowerCase(Locale.ROOT) + result.substring(1);
+        }
+        name = result; // FIXME: a parameter should not be assigned. Also declare the methods parameters as 'final'.
+        if (getGeneratorMetadata().getReservedWords().contains(name)) {
             return escapeReservedWord(name);
         } else if (name.chars().anyMatch(character -> specialCharReplacements.containsKey(String.valueOf((char) character)))) {
             return org.openapijsonschematools.codegen.common.StringUtils.escape(name, specialCharReplacements, null, null);
@@ -1032,88 +880,8 @@ public class DefaultGenerator implements Generator {
         if ("".equals(modelPackage())) {
             return refClass;
         } else {
-            return modelPackage() + "." + refClass;
+            return modelPackage + "." + refClass;
         }
-    }
-
-    protected Stability getStability() {
-        return Stability.STABLE;
-    }
-
-    /**
-     * Default constructor.
-     * This method will map between OAS type and language-specified type, as well as mapping
-     * between OAS type and the corresponding import statement for the language. This will
-     * also add some language specified CLI options, if any.
-     * returns string presentation of the example path (it's a constructor)
-     */
-    public DefaultGenerator() {
-        GeneratorType generatorType = getTag();
-        if (generatorType == null) {
-            generatorType = GeneratorType.OTHER;
-        }
-
-        generatorMetadata = GeneratorMetadata.newBuilder()
-                .stability(getStability())
-                .featureSet(DefaultFeatureSet)
-                .generationMessage(String.format(Locale.ROOT, "OpenAPI JSON Schema Generator: %s (%s)", getName(), generatorType.toValue()))
-                .build();
-
-        defaultIncludes = new HashSet<>(
-                Arrays.asList("double",
-                        "int",
-                        "long",
-                        "short",
-                        "char",
-                        "float",
-                        "String",
-                        "boolean",
-                        "Boolean",
-                        "Double",
-                        "Void",
-                        "Integer",
-                        "Long",
-                        "Float")
-        );
-
-        typeMapping = new HashMap<>();
-        typeMapping.put("array", "List");
-        typeMapping.put("set", "Set");
-        typeMapping.put("map", "Map");
-        typeMapping.put("boolean", "Boolean");
-        typeMapping.put("string", "String");
-        typeMapping.put("int", "Integer");
-        typeMapping.put("float", "Float");
-        typeMapping.put("double", "Double");
-        typeMapping.put("number", "BigDecimal");
-        typeMapping.put("decimal", "BigDecimal");
-        typeMapping.put("DateTime", "Date");
-        typeMapping.put("long", "Long");
-        typeMapping.put("short", "Short");
-        typeMapping.put("char", "String");
-        typeMapping.put("object", "Object");
-        typeMapping.put("integer", "Integer");
-        // FIXME: java specific type should be in Java Based Abstract Implementations
-        typeMapping.put("ByteArray", "byte[]");
-        typeMapping.put("binary", "File");
-        typeMapping.put("file", "File");
-        typeMapping.put("UUID", "UUID");
-        typeMapping.put("URI", "URI");
-        typeMapping.put("AnyType", "oas_any_type_not_mapped");
-
-        instantiationTypes = new HashMap<>();
-
-        reservedWords = new HashSet<>();
-
-        // name formatting options
-        cliOptions.add(CliOption.newBoolean(CodegenConstants.ALLOW_UNICODE_IDENTIFIERS, CodegenConstants
-                .ALLOW_UNICODE_IDENTIFIERS_DESC).defaultValue(Boolean.FALSE.toString()));
-
-        // initialize special character mapping
-        initializeSpecialCharacterMapping();
-
-        // Register common Mustache lambdas.
-        registerMustacheLambdas();
     }
 
     /**
@@ -1830,7 +1598,7 @@ public class DefaultGenerator implements Generator {
 
     @Override
     public String getImport(CodegenRefInfo<?> refInfo) {
-        String prefix = "from " + packageName + ".components.";
+        String prefix = "from " + generatorSettings.packageName + ".components.";
         if (refInfo.ref instanceof CodegenSchema) {
             if (refInfo.refModuleAlias == null) {
                 return "from " + refInfo.refModuleLocation + " import " + refInfo.refModule;
@@ -1867,7 +1635,7 @@ public class DefaultGenerator implements Generator {
                     String complexType = mm.modelName;
                     if (shouldAddImport(complexType)) {
                         String refModule = complexType.split("\\.")[0];
-                        String refModuleLocation = packageName() + ".components.schema";
+                        String refModuleLocation = generatorSettings.packageName + ".components.schema";
                         CodegenRefInfo<CodegenSchema> refInfo = new CodegenRefInfo<>(new CodegenSchema(), null, refModule, refModuleLocation, null);
                         imports.add(getImport(refInfo));
                     }
@@ -1970,7 +1738,7 @@ public class DefaultGenerator implements Generator {
     }
 
     private String schemaPathFromDocRoot(String moduleLocation) {
-        return moduleLocation.replace('.', File.separatorChar).substring(packageName.length()+1);
+        return moduleLocation.replace('.', File.separatorChar).substring(generatorSettings.packageName.length()+1);
     }
 
     private LinkedHashMap<CodegenPatternInfo, CodegenSchema> getPatternProperties(Map<String, Schema> schemaPatternProperties, String jsonPath, String sourceJsonPath) {
@@ -2299,7 +2067,7 @@ public class DefaultGenerator implements Generator {
                 // import from $ref
                 property.imports = new TreeSet<>();
                 assert generatorMetadata != null;
-                addImports(property.imports, getImports(sourceJsonPath, property, generatorMetadata.getFeatureSet()));
+                addImports(property.imports, getImports(sourceJsonPath, property, getGeneratorMetadata().getFeatureSet()));
             }
             if (p.getSpecVersion().compareTo(SpecVersion.V31) < 0) {
                 //  stop processing if version is less than 3.1.0
@@ -2574,8 +2342,7 @@ public class DefaultGenerator implements Generator {
         if (addSchemaImportsFromV3SpecLocations && sourceJsonPath != null && sourceJsonPath.equals(currentJsonPath)) {
             // imports from properties/items/additionalProperties/oneOf/anyOf/allOf/not
             property.imports = new TreeSet<>();
-            assert generatorMetadata != null;
-            addImports(property.imports, getImports(sourceJsonPath, property, generatorMetadata.getFeatureSet()));
+            addImports(property.imports, getImports(sourceJsonPath, property, getGeneratorMetadata().getFeatureSet()));
         }
 
         LOGGER.debug("debugging fromSchema return: {}", property);
@@ -2606,7 +2373,7 @@ public class DefaultGenerator implements Generator {
         String operationId = getOrGenerateOperationId(operation, path, httpMethod);
 
         // remove prefix in operationId
-        if (removeOperationIdPrefix) {
+        if (generatorSettings.removeOperationIdPrefix) {
             // The prefix is everything before the removeOperationIdPrefixCount occurrence of removeOperationIdPrefixDelimiter
             String[] components = operationId.split("[" + removeOperationIdPrefixDelimiter + "]");
             if (components.length > 1) {
@@ -2619,13 +2386,14 @@ public class DefaultGenerator implements Generator {
         }
         String pascalCaseName = toModelName(operationId, null);
         String kebabCase = pascalCaseName.toLowerCase(Locale.ROOT);
+        String camelCase = camelize(pascalCaseName, true);
         return new CodegenKey(
                 operationId,
                 isValid(operationId),
                 getOperationIdSnakeCase(operationId),
                 pascalCaseName,
                 kebabCase,
-                null
+                camelCase
         );
     }
 
@@ -2814,7 +2582,7 @@ public class DefaultGenerator implements Generator {
         TreeMap<String, CodegenResponse> nonDefaultResponses = null;
         TreeMap<Integer, CodegenResponse> wildcardCodeResponses = null;
         TreeMap<Integer, CodegenResponse> statusCodeResponses = null;
-        LinkedHashSet<String> errorStatusCodes = null;
+        LinkedHashSet<Integer> errorStatusCodes = null;
         LinkedHashSet<Integer> errorWildcardStatusCodes = null;
         LinkedHashSet<Integer> nonErrorStatusCodes = null;
         LinkedHashSet<Integer> nonErrorWildcardStatusCodes = null;
@@ -2873,7 +2641,7 @@ public class DefaultGenerator implements Generator {
                     if (errorStatusCodes == null) {
                         errorStatusCodes = new LinkedHashSet<>();
                     }
-                    errorStatusCodes.add(key);
+                    errorStatusCodes.add(statusCode);
                 } else {
                     if (nonErrorStatusCodes == null) {
                         nonErrorStatusCodes = new LinkedHashSet<>();
@@ -2893,7 +2661,7 @@ public class DefaultGenerator implements Generator {
             if (wildcardCodeResponses != null) {
                 wildcardCodeResponses = new TreeMap<>(wildcardCodeResponses);
             }
-            CodegenKey responsesJsonPathPiece = getKey("responses", "misc", responsesJsonPath);
+            CodegenKey responsesJsonPathPiece = getKey("responses", "responses", responsesJsonPath);
             responses = new CodegenMap<>(responsesMap, responsesJsonPathPiece, getSubpackage(responsesJsonPath), getPathFromDocRoot(responsesJsonPath));
         }
 
@@ -2950,42 +2718,46 @@ public class DefaultGenerator implements Generator {
         }
         CodegenList<CodegenSecurityRequirementObject> security = fromSecurity(operation.getSecurity(), jsonPath + "/security");
         ExternalDocumentation externalDocs = operation.getExternalDocs();
-        CodegenKey jsonPathPiece = getKey(pathPieces[pathPieces.length-1], "verb");
+        CodegenKey jsonPathPiece = getKey(pathPieces[pathPieces.length-1], "verb", jsonPath);
         CodegenList<CodegenServer> usedServers = (servers != null) ? servers : rootOrPathServers;
         CodegenList<CodegenSecurityRequirementObject> usedSecurity = (security != null) ? security : rootSecurity;
         List<MapBuilder<?>> builders = getOperationBuilders(jsonPath, requestBody, parametersInfo, usedServers, usedSecurity);
+        CodegenKey method = getKey(pathPieces[pathPieces.length-1], "misc", jsonPath);
         String subpackage = getSubpackage(jsonPath);
+        String pathFromDocRoot = getPathFromDocRoot(jsonPath);
 
         return new CodegenOperation(
-                deprecated,
-                nonErrorStatusCodes,
-                nonErrorWildcardStatusCodes,
-                errorStatusCodes,
-                errorWildcardStatusCodes,
-                summary,
-                description,
-                produces,
-                servers,
-                requestBody,
-                parametersInfo,
-                hasRequiredParamOrBody,
-                hasOptionalParamOrBody,
-                security,
-                tags,
-                responses,
-                statusCodeResponses,
-                wildcardCodeResponses,
-                nonDefaultResponses,
-                defaultResponse,
-                callbacks,
-                externalDocs,
-                vendorExtensions,
-                operationId,
-                jsonPathPiece,
-                requestBodySchema,
-                builders,
-                subpackage
-            );
+            deprecated,
+            nonErrorStatusCodes,
+            nonErrorWildcardStatusCodes,
+            errorStatusCodes,
+            errorWildcardStatusCodes,
+            summary,
+            description,
+            produces,
+            usedServers,
+            requestBody,
+            parametersInfo,
+            hasRequiredParamOrBody,
+            hasOptionalParamOrBody,
+            usedSecurity,
+            tags,
+            responses,
+            statusCodeResponses,
+            wildcardCodeResponses,
+            nonDefaultResponses,
+            defaultResponse,
+            callbacks,
+            externalDocs,
+            vendorExtensions,
+            operationId,
+            jsonPathPiece,
+            method,
+            requestBodySchema,
+            builders,
+            subpackage,
+            pathFromDocRoot
+        );
     }
 
     protected List<MapBuilder<?>> getOperationBuilders(String jsonPath, CodegenRequestBody requestBody, CodegenParametersInfo parametersInfo, CodegenList<CodegenServer> servers, CodegenList<CodegenSecurityRequirementObject> security) {
@@ -3002,7 +2774,7 @@ public class DefaultGenerator implements Generator {
         xParametersSchema.setAdditionalProperties(Boolean.FALSE);
         CodegenSchema schema = fromSchema(xParametersSchema, sourceJsonPath, currentJsonPath);
         schema.imports = new TreeSet<>();
-        addImports(schema.imports, getImports(sourceJsonPath, schema, generatorMetadata.getFeatureSet()));
+        addImports(schema.imports, getImports(sourceJsonPath, schema, getGeneratorMetadata().getFeatureSet()));
         return schema;
     }
 
@@ -3042,7 +2814,6 @@ public class DefaultGenerator implements Generator {
             items,
             jsonPathPiece,
             subpackage,
-            null,
             operationInputClass,
             operationInputVariableName,
             pathFromDocRoot
@@ -3051,20 +2822,20 @@ public class DefaultGenerator implements Generator {
 
     protected String getPathFromDocRoot(String sourceJsonPath) {
         String moduleLocation = getModuleLocation(sourceJsonPath);
-        return moduleLocation.replace('.', File.separatorChar).substring(packageName.length()+1);
+        return moduleLocation.replace('.', File.separatorChar).substring(generatorSettings.packageName.length()+1);
     }
 
     protected String responsePathFromDocRoot(String sourceJsonPath) {
         if (sourceJsonPath.startsWith("#/components/responses")) {
             String moduleLocation = getModuleLocation(sourceJsonPath);
-            return moduleLocation.replace('.', File.separatorChar).substring(packageName.length()+1);
+            return moduleLocation.replace('.', File.separatorChar).substring(generatorSettings.packageName.length()+1);
         }
         // otherwise response is inline and the operation file is the location
         // #/paths/somePath/verb/responses/200
         int secondToLastSlashIndex = sourceJsonPath.lastIndexOf("/", sourceJsonPath.lastIndexOf("/")-1);
         String sourceJsonPathSubstring = sourceJsonPath.substring(0, secondToLastSlashIndex);
         String moduleLocation = getModuleLocation(sourceJsonPathSubstring);
-        return moduleLocation.replace('.', File.separatorChar).substring(packageName.length()+1);
+        return moduleLocation.replace('.', File.separatorChar).substring(generatorSettings.packageName.length()+1);
     }
 
     private CodegenText getCodegenText(String input) {
@@ -3356,6 +3127,86 @@ public class DefaultGenerator implements Generator {
         return true;
     }
 
+    @Override
+    public String getPascalCase(CodegenKeyType type, String lastJsonPathFragment, String jsonPath) {
+        switch (type) {
+            case SCHEMA:
+                String usedKey = escapeUnsafeCharacters(lastJsonPathFragment);
+                HashMap<String, Integer> keyToQty = sourceJsonPathToKeyToQty.getOrDefault(jsonPath, new HashMap<>());
+                if (!sourceJsonPathToKeyToQty.containsKey(jsonPath)) {
+                    sourceJsonPathToKeyToQty.put(jsonPath, keyToQty);
+                }
+                // starts with number
+                if (usedKey.matches("^\\d.*")) {
+                    LOGGER.warn("{} (component name starts with number) cannot be used as name. Renamed to Schema{}", usedKey, usedKey);
+                    usedKey = "Schema" + usedKey; // 200 -> Schema200
+                }
+
+                usedKey = camelize(usedKey);
+
+                // handle case where usedKey is empty
+                if (usedKey.isEmpty()) {
+                    // happens with a name like "/"
+                    usedKey = camelize(toEnumVarName(lastJsonPathFragment, null).toLowerCase(Locale.ROOT));
+                }
+
+                if (isReservedWord(usedKey)) {
+                    usedKey = usedKey + "Schema"; // e.g. return => ReturnSchema
+                    LOGGER.warn("{} (reserved word) cannot be used as name. Renamed to {}", lastJsonPathFragment, usedKey);
+                }
+
+                Integer qty = keyToQty.getOrDefault(usedKey, 0);
+                qty += 1;
+                keyToQty.put(usedKey, qty);
+                String suffix = "";
+                if (qty > 1) {
+                    suffix = qty.toString();
+                }
+                usedKey = usedKey + suffix;
+                return usedKey;
+            case PATH:
+                return camelize(getFilename(CodegenKeyType.PATH, lastJsonPathFragment, jsonPath));
+            case PARAMETER:
+            case RESPONSE:
+                return toModelName(lastJsonPathFragment, null);
+            case MISC:
+            case CONTENT_TYPE:
+            case OPERATION:
+            case REQUEST_BODY:
+            case HEADER:
+            case SECURITY_SCHEME:
+                return toModelName(lastJsonPathFragment, jsonPath);
+            case SERVER:
+                return "Server" + lastJsonPathFragment;
+            case SECURITY:
+                return getFilename(CodegenKeyType.SECURITY, lastJsonPathFragment, jsonPath);
+            default:
+                return null;
+        }
+    }
+
+    @Override
+    public String getFilename(CodegenKeyType type, String lastJsonPathFragment, String jsonPath) {
+        switch(type) {
+            case SCHEMA:
+                String[] schemaPieces = jsonPath.split("/");
+                return schemaPieces[schemaPieces.length-1];
+            case OPERATION:
+                return lastJsonPathFragment;
+            case CONTENT_TYPE:
+                return toModuleFilename(lastJsonPathFragment, null);
+            case PATH:
+            case SERVER:
+            case PARAMETER:
+            case SECURITY:
+            case SECURITY_SCHEME:
+            case REQUEST_BODY:
+            case RESPONSE:
+                return toModuleFilename(lastJsonPathFragment, jsonPath);
+            default:
+                return null;
+        }
+    }
 
     @Override
     @SuppressWarnings("static-method")
@@ -3525,15 +3376,16 @@ public class DefaultGenerator implements Generator {
         return cs;
     }
 
-    protected void setReservedWordsLowerCase(List<String> words) {
-        reservedWords = new HashSet<>();
+    protected static Set<String> getLowerCaseWords(List<String> words) {
+        Set<String> lowerCaseWords = new HashSet<>();
         for (String word : words) {
-            reservedWords.add(word.toLowerCase(Locale.ROOT));
+            lowerCaseWords.add(word.toLowerCase(Locale.ROOT));
         }
+        return lowerCaseWords;
     }
 
     protected boolean isReservedWord(String word) {
-        return word != null && reservedWords.contains(word.toLowerCase(Locale.ROOT));
+        return word != null && getGeneratorMetadata().getReservedWords().contains(word.toLowerCase(Locale.ROOT));
     }
 
     /**
@@ -3580,8 +3432,7 @@ public class DefaultGenerator implements Generator {
      * @return true if the library/module/package of the corresponding type needs to be imported
      */
     protected boolean needToImport(String type) {
-        return StringUtils.isNotBlank(type) && !defaultIncludes.contains(type)
-                && !languageSpecificPrimitives.contains(type);
+        return true;
     }
 
     protected void addImports(Set<String> importsToBeAddedTo, Set<String> importsToAdd) {
@@ -3708,7 +3559,7 @@ public class DefaultGenerator implements Generator {
                 continue;
             }
             final CodegenSchema prop = entry.getValue();
-            if (prop.refInfo != null) {
+            if (prop.hasAnyRefs()) {
                 allAreInline = false;
             }
             optionalProperties.put(key, prop);
@@ -3723,45 +3574,11 @@ public class DefaultGenerator implements Generator {
         return optionalProperties;
     }
 
-    /**
-     * Remove characters not suitable for variable or method name from the input and camel case it
-     *
-     * @param name string to be camel case
-     * @return camel case string
-     */
-    @SuppressWarnings("static-method")
-    public String removeNonNameElementToCamelCase(String name) {
-        return removeNonNameElementToCamelCase(name, "[-_:;#" + removeOperationIdPrefixDelimiter + "]");
-    }
-
-    /**
-     * Remove characters that is not good to be included in method name from the input and camel case it
-     *
-     * @param name                  string to be camel case
-     * @param nonNameElementPattern a regex pattern of the characters that is not good to be included in name
-     * @return camel case string
-     */
-    protected String removeNonNameElementToCamelCase(final String name, final String nonNameElementPattern) {
-        String result = Arrays.stream(name.split(nonNameElementPattern))
-                .map(StringUtils::capitalize)
-                .collect(Collectors.joining(""));
-        if (!result.isEmpty()) {
-            result = result.substring(0, 1).toLowerCase(Locale.ROOT) + result.substring(1);
-        }
-        return result;
-    }
-
     @Override
     public String modelPackagePathFragment() {
         return modelPackage.replace('.', File.separatorChar);
     }
-
-    @Override
-    public String getSchemaFilename(String jsonPath) {
-        String[] pieces = jsonPath.split("/");
-        return pieces[pieces.length-1];
-    }
-
+    
     protected void updateComponentsFilepath(String[] pathPieces) {
         if (pathPieces.length < 3) {
             return;
@@ -3773,14 +3590,13 @@ public class DefaultGenerator implements Generator {
         // rename schemas + requestBodies
         switch (pathPieces[2]) {
             case "schemas":
+                // #/components/schemas/SomeSchema
                 // modelPackage replaces pathPieces[1] + pathPieces[2]
-                String fragment = modelPackagePathFragment();
-                String[] fragments = fragment.split("/");
-                pathPieces[1] = fragments[0];
+                String[] fragments = modelPackage.split("\\.");
                 pathPieces[2] = fragments[1];
                 if (pathPieces.length == 4) {
                     // #/components/schemas/SomeSchema
-                    pathPieces[3] = getSchemaFilename(jsonPath);
+                    pathPieces[3] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath);
                 }
                 return;
             case "requestBodies":
@@ -3795,43 +3611,43 @@ public class DefaultGenerator implements Generator {
         }
         if (pathPieces[2].equals("headers")) {
             // #/components/headers
-            pathPieces[3] = toHeaderFilename(pathPieces[3], jsonPath);
+            pathPieces[3] = getFilename(CodegenKeyType.HEADER, pathPieces[3], jsonPath);
             if (pathPieces.length == 5 && pathPieces[4].equals("schema")) {
                 // #/components/headers/someHeader/schema
-                pathPieces[4] = getSchemaFilename(jsonPath);
+                pathPieces[4] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
             } else if (pathPieces.length >= 6 && pathPieces[4].equals("content")) {
                 // #/components/headers/someHeader/content/application-json -> length 6
                 String contentType = ModelUtils.decodeSlashes(pathPieces[5]);
-                pathPieces[5] = toContentTypeFilename(contentType);
+                pathPieces[5] = getFilename(CodegenKeyType.CONTENT_TYPE, contentType, jsonPath);
                 if (pathPieces.length == 7) {
-                    pathPieces[6] = getSchemaFilename(jsonPath);
+                    pathPieces[6] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
                 }
             }
         } else if (pathPieces[2].equals("parameters")) {
-            pathPieces[3] = toParameterFilename(pathPieces[3], jsonPath);
+            pathPieces[3] = getFilename(CodegenKeyType.PARAMETER, pathPieces[3], jsonPath);
             if (pathPieces.length == 5 && pathPieces[4].equals("schema")) {
-                pathPieces[4] = getSchemaFilename(jsonPath);
+                pathPieces[4] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
             } else if (pathPieces.length >= 6 && pathPieces[4].equals("content")) {
                 // #/components/parameters/someParam/content/application-json -> length 6
                 String contentType = ModelUtils.decodeSlashes(pathPieces[5]);
-                pathPieces[5] = toContentTypeFilename(contentType);
+                pathPieces[5] = getFilename(CodegenKeyType.CONTENT_TYPE, contentType, jsonPath);
                 if (pathPieces.length == 7) {
-                    pathPieces[6] = getSchemaFilename(jsonPath);
+                    pathPieces[6] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
                 }
             }
         } else if (pathPieces[2].equals(requestBodiesIdentifier)) {
-            pathPieces[3] = toRequestBodyFilename(pathPieces[3], jsonPath);
+            pathPieces[3] = getFilename(CodegenKeyType.REQUEST_BODY, pathPieces[3], jsonPath);
             if (pathPieces.length >= 6 && pathPieces[4].equals("content")) {
                 // #/components/requestBodies/someBody/content/application-json -> length 6
                 String contentType = ModelUtils.decodeSlashes(pathPieces[5]);
-                pathPieces[5] = toContentTypeFilename(contentType);
+                pathPieces[5] = getFilename(CodegenKeyType.CONTENT_TYPE, contentType, jsonPath);
                 if (pathPieces.length == 7) {
-                    pathPieces[6] = getSchemaFilename(jsonPath);
+                    pathPieces[6] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
                 }
             }
         } else if (pathPieces[2].equals("responses")) {
             // #/components/responses/SuccessWithJsonApiResponse/headers
-            pathPieces[3] = toResponseModuleName(pathPieces[3], jsonPath);
+            pathPieces[3] = getFilename(CodegenKeyType.RESPONSE, pathPieces[3], jsonPath);
             if (pathPieces.length == 4) {
                 // #/components/responses/SuccessWithJsonApiResponse
                 return;
@@ -3840,28 +3656,28 @@ public class DefaultGenerator implements Generator {
             if (pathPieces.length == 5 && pathPieces[4].equals(headersSchemaFragment)) {
                 // synthetic json path
                 // #/components/responses/someResponse/Headers
-                pathPieces[4] = getSchemaFilename(jsonPath);
+                pathPieces[4] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
                 return;
             }
 
             if (pathPieces[4].equals("headers")) {
                 if (pathPieces.length == 5) {
-                    pathPieces[4] = toHeaderFilename(pathPieces[4], jsonPath);
+                    pathPieces[4] = getFilename(CodegenKeyType.HEADER, pathPieces[4], jsonPath);
                     // #/components/responses/someResponse/headers
                     return;
                 }
                 // #/components/responses/someResponse/headers/SomeHeader-> length 6
-                pathPieces[5] = toHeaderFilename(pathPieces[5], jsonPath);
+                pathPieces[5] = getFilename(CodegenKeyType.HEADER, pathPieces[5], jsonPath);
                 if (pathPieces.length == 7 && pathPieces[6].equals("schema")) {
                     // #/components/responses/someResponse/headers/SomeHeader/schema
-                    pathPieces[6] = getSchemaFilename(jsonPath);
+                    pathPieces[6] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
                 } else if (pathPieces.length >= 8 && pathPieces[6].equals("content")) {
                     // #/components/responses/someResponse/headers/SomeHeader/content/application-json -> length 8
                     String contentType = ModelUtils.decodeSlashes(pathPieces[7]);
-                    pathPieces[7] = toContentTypeFilename(contentType);
+                    pathPieces[7] = getFilename(CodegenKeyType.CONTENT_TYPE, contentType, jsonPath);
                     if (pathPieces.length == 9) {
                         // #/components/responses/someResponse/headers/SomeHeader/content/application-json/schema
-                        pathPieces[8] = getSchemaFilename(jsonPath);
+                        pathPieces[8] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
                     }
                 }
             } else if (pathPieces[4].equals("content")) {
@@ -3871,13 +3687,13 @@ public class DefaultGenerator implements Generator {
                 }
                 // #/components/responses/someResponse/content/application-json -> length 6
                 String contentType = ModelUtils.decodeSlashes(pathPieces[5]);
-                pathPieces[5] = toContentTypeFilename(contentType);
+                pathPieces[5] = getFilename(CodegenKeyType.CONTENT_TYPE, contentType, jsonPath);
                 if (pathPieces.length == 7) {
-                    pathPieces[6] = getSchemaFilename(jsonPath);
+                    pathPieces[6] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
                 }
             }
         } else if (pathPieces[2].equals(securitySchemesIdentifier)) {
-            pathPieces[3] = toSecuritySchemeFilename(pathPieces[3], null);
+            pathPieces[3] = getFilename(CodegenKeyType.SECURITY_SCHEME, pathPieces[3], jsonPath);
         }
     }
 
@@ -3889,26 +3705,21 @@ public class DefaultGenerator implements Generator {
             return;
         }
         // #/paths/somePath
-        pathPieces[2] = toPathFilename(ModelUtils.decodeSlashes(pathPieces[2]), jsonPath);
+        pathPieces[2] = getFilename(CodegenKeyType.PATH, ModelUtils.decodeSlashes(pathPieces[2]), jsonPath);
         if (pathPieces.length < 4) {
             return;
         }
-        Set<String> xParameters = new HashSet<>();
-        xParameters.add("PathParameters");
-        xParameters.add("QueryParameters");
-        xParameters.add("HeaderParameters");
-        xParameters.add("CookieParameters");
         if (pathPieces[3].equals("servers")) {
             if (pathPieces.length == 4) {
                 // #/paths/somePath/servers
-                pathPieces[3] = toServerFilename("s", jsonPath);
+                pathPieces[3] = getFilename(CodegenKeyType.SERVER, "servers", jsonPath);
             } else if (pathPieces.length == 5) {
                 // #/paths/somePath/servers/0
-                pathPieces[4] = toServerFilename(pathPieces[4], jsonPath);
+                pathPieces[4] = getFilename(CodegenKeyType.SERVER, pathPieces[4], jsonPath);
             } else {
                 // #/paths/somePath/servers/0/variables
                 pathPieces[4] = "server" + pathPieces[4];
-                pathPieces[5] = "Variables";
+                pathPieces[5] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
             }
             return;
         } else if (pathPieces[3].equals("parameters")) {
@@ -3917,58 +3728,58 @@ public class DefaultGenerator implements Generator {
                 return;
             }
             // #/paths/somePath/parameters/0
-            pathPieces[4] = toParameterFilename(pathPieces[4], jsonPath);
+            pathPieces[4] = getFilename(CodegenKeyType.PARAMETER, pathPieces[4], jsonPath);
             if (pathPieces.length >= 7 && pathPieces[5].equals("content")) {
                 // #/paths/somePath/parameters/0/content/application-json -> length 7
                 String contentType = ModelUtils.decodeSlashes(pathPieces[6]);
-                pathPieces[6] = toContentTypeFilename(contentType);
+                pathPieces[6] = getFilename(CodegenKeyType.CONTENT_TYPE, contentType, jsonPath);
                 if (pathPieces.length == 8) {
-                    pathPieces[7] = getSchemaFilename(jsonPath);
+                    pathPieces[7] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
                     return;
                 }
             } else if (pathPieces.length == 6 && pathPieces[5].equals("schema")) {
                 // #/paths/somePath/parameters/0/schema -> length 7
-                pathPieces[5] = getSchemaFilename(jsonPath);
+                pathPieces[5] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
                 return;
             }
         } else if (pathPieces.length == 4) {
             // #/paths/SomePath/get
-            pathPieces[3] = toOperationFilename(pathPieces[3], jsonPath);
+            pathPieces[3] = getFilename(CodegenKeyType.OPERATION, pathPieces[3], jsonPath);
             return;
         }
         if (xParameters.contains(pathPieces[4])) {
             // #/paths/somePath/get/PathParameters
             // synthetic jsonPath
-            pathPieces[4] = getSchemaFilename(jsonPath);
+            pathPieces[4] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
         } else if (pathPieces[4].equals("servers")) {
             if (pathPieces.length == 5) {
                 // #/paths/somePath/get/servers
-                pathPieces[4] = toServerFilename("servers", jsonPath);
+                pathPieces[4] = getFilename(CodegenKeyType.SERVER, "servers", jsonPath);
             } else if (pathPieces.length == 6) {
                 // #/paths/somePath/get/servers/0
-                pathPieces[5] = toServerFilename(pathPieces[5], jsonPath);
+                pathPieces[5] = getFilename(CodegenKeyType.SERVER, pathPieces[5], jsonPath);
             } else {
                 // #/paths/somePath/get/servers/0/variables
                 pathPieces[5] = "server" + pathPieces[5];
-                pathPieces[6] = "Variables";
+                pathPieces[6] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
             }
         } else if (pathPieces[4].equals("security")) {
             // #/paths/somePath/get/security
             if (pathPieces.length == 5) {
-                pathPieces[4] = toSecurityFilename("security", jsonPath);
+                pathPieces[4] = getFilename(CodegenKeyType.SECURITY, "security", jsonPath);
             } else {
                 // #/paths/somePath/get/security/0
-                pathPieces[5] = toSecurityFilename(pathPieces[5], jsonPath);
+                pathPieces[5] = getFilename(CodegenKeyType.SECURITY, pathPieces[5], jsonPath);
             }
             return;
         } else if (pathPieces[4].equals("responses")) {
             if (pathPieces.length == 5) {
                 // #/paths/user_login/get/responses -> length 5
-                pathPieces[4] = toResponseModuleName(pathPieces[4], jsonPath);
+                pathPieces[4] = getFilename(CodegenKeyType.RESPONSE, pathPieces[4], jsonPath);
                 return;
             }
             // #/paths/user_login/get/responses/200 -> 200 -> response_200 -> length 6
-            pathPieces[5] = toResponseModuleName(pathPieces[5], jsonPath);
+            pathPieces[5] = getFilename(CodegenKeyType.RESPONSE, pathPieces[5], jsonPath);
             if (pathPieces.length == 6) {
                 // #/paths/user_login/get/responses/200
                 return;
@@ -3977,7 +3788,7 @@ public class DefaultGenerator implements Generator {
             if (pathPieces.length == 7 && pathPieces[6].equals(headersSchemaFragment)) {
                 // synthetic json path
                 // #/paths/user_login/get/responses/200/Headers
-                pathPieces[6] = getSchemaFilename(jsonPath);
+                pathPieces[6] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
                 return;
             }
 
@@ -3988,79 +3799,81 @@ public class DefaultGenerator implements Generator {
                 }
                 // #/paths/somePath/get/responses/200/content/application-json -> length 8
                 String contentType = ModelUtils.decodeSlashes(pathPieces[7]);
-                pathPieces[7] = toContentTypeFilename(contentType);
+                pathPieces[7] = getFilename(CodegenKeyType.CONTENT_TYPE, contentType, jsonPath);
                 if (pathPieces.length == 9) {
-                    pathPieces[8] = getSchemaFilename(jsonPath);
+                    pathPieces[8] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
                 }
             } else if (pathPieces[6].equals("headers")) {
                 if (pathPieces.length == 7) {
                     // #/paths/somePath/get/responses/200/headers
-                    pathPieces[6] = toHeaderFilename(pathPieces[6], jsonPath);
+                    pathPieces[6] = getFilename(CodegenKeyType.HEADER, pathPieces[6], jsonPath);
                     return;
                 }
                 // #/paths/somePath/get/responses/200/headers/someHeader -> length 8
-                pathPieces[7] = toHeaderFilename(pathPieces[7], jsonPath);
+                pathPieces[7] = getFilename(CodegenKeyType.HEADER, pathPieces[7], jsonPath);
 
                 if (pathPieces.length >= 10 && pathPieces[8].equals("content")) {
                     // #/paths/somePath/get/responses/200/headers/someHeader/content/application-json -> length 10
                     String contentType = ModelUtils.decodeSlashes(pathPieces[9]);
-                    pathPieces[9] = toContentTypeFilename(contentType);
+                    pathPieces[9] = getFilename(CodegenKeyType.CONTENT_TYPE, contentType, jsonPath);
                     if (pathPieces.length == 11) {
-                        pathPieces[10] = getSchemaFilename(jsonPath);
+                        pathPieces[10] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
                     }
                 } else if (pathPieces.length == 9 && pathPieces[8].equals("schema")) {
-                    pathPieces[8] = getSchemaFilename(jsonPath);
+                    pathPieces[8] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
                 }
             }
         } else if (pathPieces[4].equals("parameters")) {
             if (pathPieces.length == 5) {
                 // #/paths/somePath/get/parameters -> length 5
-                pathPieces[4] = toParameterFilename(pathPieces[4], jsonPath);
+                pathPieces[4] = getFilename(CodegenKeyType.PARAMETER, pathPieces[4], jsonPath);
                 return;
             }
             // #/paths/somePath/get/parameters/0 -> length 6
-            pathPieces[5] = toParameterFilename(pathPieces[5], jsonPath);
+            pathPieces[5] = getFilename(CodegenKeyType.PARAMETER, pathPieces[5], jsonPath);
 
             if (pathPieces.length >= 8 && pathPieces[6].equals("content")) {
                 // #/paths/somePath/get/parameters/1/content/application-json -> length 8
                 String contentType = ModelUtils.decodeSlashes(pathPieces[7]);
-                pathPieces[7] = toContentTypeFilename(contentType);
+                pathPieces[7] = getFilename(CodegenKeyType.CONTENT_TYPE, contentType, jsonPath);
                 if (pathPieces.length == 9) {
-                    pathPieces[8] = getSchemaFilename(jsonPath);
+                    pathPieces[8] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
                 }
             } else if (pathPieces.length == 7 && pathPieces[6].equals("schema")) {
                 // #/paths/somePath/get/parameters/0/schema -> length 7
-                pathPieces[6] = getSchemaFilename(jsonPath);
+                pathPieces[6] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
             }
         } else if (pathPieces[4].equals("requestBody")) {
             if (pathPieces.length == 5) {
                 // #/paths/somePath/get/requestBody
-                pathPieces[4] = toRequestBodyFilename("requestBody", jsonPath);
+                pathPieces[4] = getFilename(CodegenKeyType.REQUEST_BODY, "requestBody", jsonPath);
                 return;
             }
             pathPieces[4] = requestBodyIdentifier;
             if (pathPieces.length >= 7 && pathPieces[5].equals("content")) {
                 // #/paths/somePath/get/requestBody/content/application-json -> length 7
                 String contentType = ModelUtils.decodeSlashes(pathPieces[6]);
-                pathPieces[6] = toContentTypeFilename(contentType);
+                pathPieces[6] = getFilename(CodegenKeyType.CONTENT_TYPE, contentType, jsonPath);
                 if (pathPieces.length == 8) {
                     // #/paths/somePath/get/requestBody/content/application-json/schema
-                    pathPieces[7] = getSchemaFilename(jsonPath);
+                    pathPieces[7] = getFilename(CodegenKeyType.SCHEMA, pathPieces[pathPieces.length-1], jsonPath) ;
                 }
             }
         }
     }
 
     protected void updateServersFilepath(String[] pathPieces) {
-        String jsonPath = String.join("/", pathPieces);
+        String[] copiedPathPieces = pathPieces.clone();
+        copiedPathPieces[0] = "#";
+        String jsonPath = String.join("/", copiedPathPieces);
         if (pathPieces.length == 2) {
             // #/servers
         } else if (pathPieces.length == 3) {
             // #/servers/0
-            pathPieces[2] = toServerFilename(pathPieces[2], jsonPath);
+            pathPieces[2] = getFilename(CodegenKeyType.SERVER, pathPieces[2], jsonPath);
         } else {
             // #/servers/0/variables
-            pathPieces[2] = toServerFilename(pathPieces[2], jsonPath).toLowerCase(Locale.ROOT);
+            pathPieces[2] = getFilename(CodegenKeyType.SERVER, pathPieces[2], jsonPath).toLowerCase(Locale.ROOT);
             pathPieces[3] = "Variables";
         }
     }
@@ -4069,11 +3882,11 @@ public class DefaultGenerator implements Generator {
         String jsonPath = String.join("/", pathPieces);
         if (pathPieces.length < 3) {
             // #/security
-            pathPieces[1] = toSecurityFilename("security", jsonPath);
+            pathPieces[1] = getFilename(CodegenKeyType.SECURITY, "security", jsonPath);
             return;
         }
         // #/security/0
-        pathPieces[2] = toSecurityFilename(pathPieces[2], jsonPath);
+        pathPieces[2] = getFilename(CodegenKeyType.SECURITY, pathPieces[2], jsonPath);
     }
 
     private void updateApisFilepath(String[] pathPieces) {
@@ -4082,39 +3895,21 @@ public class DefaultGenerator implements Generator {
         // #/apis/tags/someTag
         // #/apis/paths
         // #/apis/paths/somePath
-        pathPieces[1] = apiPackage.replace('.', File.separatorChar);
+        String[] originalPieces = pathPieces.clone();
+        originalPieces[0] = "#";
+        String jsonPath = String.join("/", originalPieces);
+
+        pathPieces[1] = generatorSettings.apiPackage.replace('.', File.separatorChar);
         if (pathPieces.length < 4) {
             return;
         }
         if (pathPieces[2].equals("tags")) {
             pathPieces[3] = toApiFilename(pathPieces[3]);
         } else if (pathPieces[2].equals("paths")) {
-            pathPieces[3] = toPathFilename(ModelUtils.decodeSlashes(pathPieces[3]), null);
+            pathPieces[3] = getFilename(CodegenKeyType.PATH, ModelUtils.decodeSlashes(pathPieces[3]), jsonPath);
         }
     }
-
-    @Override
-    public String getFilepath(String jsonPath) {
-        String[] pathPieces = jsonPath.split("/");
-        pathPieces[0] = outputFolder + File.separatorChar + packagePath();
-        if (jsonPath.startsWith("#/components")) {
-            updateComponentsFilepath(pathPieces);
-        } else if (jsonPath.startsWith("#/paths")) {
-            updatePathsFilepath(pathPieces);
-        } else if (jsonPath.startsWith("#/servers")) {
-            updateServersFilepath(pathPieces);
-        } else if (jsonPath.startsWith("#/security")) {
-            updateSecurityFilepath(pathPieces);
-        } else if (jsonPath.startsWith("#/apis")) {
-            // this is a fake json path that the code generates and uses to generate apis
-            updateApisFilepath(pathPieces);
-        }
-        List<String> finalPathPieces = Arrays.stream(pathPieces)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-        return String.join(File.separator, finalPathPieces);
-    }
-
+    
     @Override
     public String getSubpackage(String jsonPath) {
         String[] pathPieces = jsonPath.split("/");
@@ -4141,65 +3936,61 @@ public class DefaultGenerator implements Generator {
         }
         return subpackage.substring(1,lastPeriodIndex);
     }
+
     @Override
-    public String getTestFilepath(String jsonPath) {
+    public String getFilePath(GeneratedFileType type, String jsonPath) {
         String[] pathPieces = jsonPath.split("/");
-        pathPieces[0] = outputFolder + File.separatorChar + "test";
-        if (jsonPath.startsWith("#/components")) {
-            // #/components/schemas/someSchema
-            updateComponentsFilepath(pathPieces);
-            if (pathPieces.length == 4) {
-                int lastIndex = pathPieces.length - 1;
-                pathPieces[lastIndex] = "test_" + pathPieces[lastIndex];
-            }
-        } else if (jsonPath.startsWith("#/paths")) {
-            updatePathsFilepath(pathPieces);
-            // #/paths/somePath/get
-            if (pathPieces.length == 4) {
-                int lastIndex = pathPieces.length - 1;
-                pathPieces[lastIndex] = "test_" + pathPieces[lastIndex];
-            }
+        switch (type) {
+            case CODE:
+                pathPieces[0] = generatorSettings.outputFolder + File.separatorChar + packagePath();
+                if (jsonPath.startsWith("#/components")) {
+                    updateComponentsFilepath(pathPieces);
+                } else if (jsonPath.startsWith("#/paths")) {
+                    updatePathsFilepath(pathPieces);
+                } else if (jsonPath.startsWith("#/servers")) {
+                    updateServersFilepath(pathPieces);
+                } else if (jsonPath.startsWith("#/security")) {
+                    updateSecurityFilepath(pathPieces);
+                } else if (jsonPath.startsWith("#/apis")) {
+                    // this is a fake json path that the code generates and uses to generate apis
+                    updateApisFilepath(pathPieces);
+                }
+                break;
+            case DOCUMENTATION:
+                pathPieces[0] = generatorSettings.outputFolder + File.separatorChar + docsFolder;
+                if (jsonPath.startsWith("#/components")) {
+                    updateComponentsFilepath(pathPieces);
+                } else if (jsonPath.startsWith("#/paths")) {
+                    updatePathsFilepath(pathPieces);
+                } else if (jsonPath.startsWith("#/servers")) {
+                    updateServersFilepath(pathPieces);
+                } else if (jsonPath.startsWith("#/apis")) {
+                    // this is a fake json path that the code generates and uses to generate apis
+                    updateApisFilepath(pathPieces);
+                }
+                break;
+            case TEST:
+                pathPieces[0] = generatorSettings.outputFolder + File.separatorChar + "test";
+                if (jsonPath.startsWith("#/components")) {
+                    // #/components/schemas/someSchema
+                    updateComponentsFilepath(pathPieces);
+                    if (pathPieces.length == 4) {
+                        int lastIndex = pathPieces.length - 1;
+                        pathPieces[lastIndex] = "test_" + pathPieces[lastIndex];
+                    }
+                } else if (jsonPath.startsWith("#/paths")) {
+                    updatePathsFilepath(pathPieces);
+                    // #/paths/somePath/get
+                    if (pathPieces.length == 4) {
+                        int lastIndex = pathPieces.length - 1;
+                        pathPieces[lastIndex] = "test_" + pathPieces[lastIndex];
+                    }
+                }
         }
-        List<String> finalPathPieces = Arrays.stream(pathPieces)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-        return String.join(File.separator, finalPathPieces);
-    }
-
-
-    @Override
-    public String getDocsFilepath(String jsonPath) {
-        String[] pathPieces = jsonPath.split("/");
-        pathPieces[0] = outputFolder + File.separatorChar + docsFolder;
-        if (jsonPath.startsWith("#/components")) {
-            updateComponentsFilepath(pathPieces);
-        } else if (jsonPath.startsWith("#/paths")) {
-            updatePathsFilepath(pathPieces);
-        } else if (jsonPath.startsWith("#/servers")) {
-            updateServersFilepath(pathPieces);
-        } else if (jsonPath.startsWith("#/apis")) {
-            // this is a fake json path that the code generates and uses to generate apis
-            updateApisFilepath(pathPieces);
-        }
-        List<String> finalPathPieces = Arrays.stream(pathPieces)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
-        return String.join(File.separator, finalPathPieces);
-    }
-
-    @Override
-    public boolean isSkipOverwrite() {
-        return skipOverwrite;
-    }
-
-    @Override
-    public void setSkipOverwrite(boolean skipOverwrite) {
-        this.skipOverwrite = skipOverwrite;
-    }
-
-    @Override
-    public void setRemoveOperationIdPrefix(boolean removeOperationIdPrefix) {
-        this.removeOperationIdPrefix = removeOperationIdPrefix;
+        List<String> codePieces = Arrays.stream(pathPieces)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toList());
+        return String.join(File.separator, codePieces);
     }
 
     public void setRemoveOperationIdPrefixDelimiter(String removeOperationIdPrefixDelimiter) {
@@ -4208,21 +3999,6 @@ public class DefaultGenerator implements Generator {
 
     public void setRemoveOperationIdPrefixCount(int removeOperationIdPrefixCount) {
         this.removeOperationIdPrefixCount = removeOperationIdPrefixCount;
-    }
-
-    @Override
-    public void setSkipOperationExample(boolean skipOperationExample) {
-        this.skipOperationExample = skipOperationExample;
-    }
-
-    @Override
-    public boolean isHideGenerationTimestamp() {
-        return hideGenerationTimestamp;
-    }
-
-    @Override
-    public void setHideGenerationTimestamp(boolean hideGenerationTimestamp) {
-        this.hideGenerationTimestamp = hideGenerationTimestamp;
     }
 
     /**
@@ -4248,13 +4024,8 @@ public class DefaultGenerator implements Generator {
     }
 
     @Override
-    public void setTemplateEngineName(String templateEngineName) {
-        this.templateEngineName = templateEngineName;
-    }
-
-    @Override
     public TemplatingEngineAdapter getTemplatingEngine() {
-        String loadedTemplateEngineName = templateEngineName;
+        String loadedTemplateEngineName = generatorSettings.templateEngineName;
         if (loadedTemplateEngineName ==  null) {
             loadedTemplateEngineName = defaultTemplatingEngine();
         }
@@ -4355,7 +4126,7 @@ public class DefaultGenerator implements Generator {
         LinkedHashMap<String, EnumValue> enumNameToValue = new LinkedHashMap<>();
         int truncateIdx = 0;
 
-        if (isRemoveEnumValuePrefix()) {
+        if (generatorSettings.removeEnumValuePrefix) {
             String commonPrefix = findCommonPrefixOfVars(values);
             truncateIdx = commonPrefix.length();
         }
@@ -4451,20 +4222,6 @@ public class DefaultGenerator implements Generator {
     }
 
     /**
-     * reads propertyKey from additionalProperties, converts it to a boolean and
-     * writes it back to additionalProperties to be usable as a boolean in
-     * mustache files.
-     *
-     * @param propertyKey property key
-     * @return property value as boolean
-     */
-    public boolean convertPropertyToBooleanAndWriteBack(String propertyKey) {
-        boolean result = convertPropertyToBoolean(propertyKey);
-        writePropertyBack(propertyKey, result);
-        return result;
-    }
-
-    /**
      * Provides an override location, if any is specified, for the .openapi-generator-ignore.
      * <p>
      * This is originally intended for the first generation only.
@@ -4476,34 +4233,7 @@ public class DefaultGenerator implements Generator {
         return ignoreFilePathOverride;
     }
 
-    /**
-     * Sets an override location for the '.openapi-generator-ignore' location for the first code generation.
-     *
-     * @param ignoreFileOverride The full path to an ignore file
-     */
-    @Override
-    public void setIgnoreFilePathOverride(final String ignoreFileOverride) {
-        this.ignoreFilePathOverride = ignoreFileOverride;
-    }
-
-    public boolean convertPropertyToBoolean(String propertyKey) {
-        final Object booleanValue = additionalProperties.get(propertyKey);
-        boolean result = Boolean.FALSE;
-        if (booleanValue instanceof Boolean) {
-            result = (Boolean) booleanValue;
-        } else if (booleanValue instanceof String) {
-            result = Boolean.parseBoolean((String) booleanValue);
-        } else {
-            LOGGER.warn("The value (generator's option) must be either boolean or string. Default to `false`.");
-        }
-        return result;
-    }
-
-    public void writePropertyBack(String propertyKey, boolean value) {
-        additionalProperties.put(propertyKey, value);
-    }
-
-//    private List<Map<String, Object>> getScopes(Scopes scopes) {
+    //    private List<Map<String, Object>> getScopes(Scopes scopes) {
 //        if (scopes != null && !scopes.isEmpty()) {
 //            List<Map<String, Object>> newScopes = new ArrayList<>();
 //            for (Map.Entry<String, String> scopeEntry : scopes.entrySet()) {
@@ -4579,21 +4309,6 @@ public class DefaultGenerator implements Generator {
         return produces;
     }
 
-    @Override
-    public GeneratorType getTag() {
-        return null;
-    }
-
-    @Override
-    public String getName() {
-        return null;
-    }
-
-    @Override
-    public String getHelp() {
-        return null;
-    }
-
     protected LinkedHashMap<CodegenKey, CodegenMediaType> getContent(Content content, String sourceJsonPath) {
         if (content == null) {
             return null;
@@ -4654,10 +4369,6 @@ public class DefaultGenerator implements Generator {
         return cmtContent;
     }
 
-    public String toRequestBodyFilename(String componentName, String jsonPath) {
-        return toModuleFilename(componentName, jsonPath);
-    }
-
     protected String toRefModule(String ref, String sourceJsonPath, String expectedComponentType) {
         if (ref == null) {
             return null;
@@ -4681,13 +4392,13 @@ public class DefaultGenerator implements Generator {
         }
         switch (expectedComponentType) {
             case "requestBodies":
-                return toRequestBodyFilename(refPieces[3], ref);
+                return getFilename(CodegenKeyType.REQUEST_BODY, refPieces[3], ref);
             case "responses":
-                return toResponseModuleName(refPieces[3], ref);
+                return getFilename(CodegenKeyType.RESPONSE, refPieces[3], ref);
             case "headers":
-                return toHeaderFilename(refPieces[3], ref);
+                return getFilename(CodegenKeyType.HEADER, refPieces[3], ref);
             case "parameters":
-                return toParameterFilename(refPieces[3], ref);
+                return getFilename(CodegenKeyType.PARAMETER, refPieces[3], ref);
             case "schemas":
                 if (ref.equals(sourceJsonPath)) {
                     // property is of type self
@@ -4696,9 +4407,9 @@ public class DefaultGenerator implements Generator {
                 // Two use cases
                 // 1. #/components/schemas/SomeSchema (component schemas)
                 // 2. #/paths/~1pet~1{petId}/get/parameters/0/schema (other schemas: parameters, response headers etc)
-                return getSchemaFilename(ref);
+                return getFilename(CodegenKeyType.SCHEMA, refPieces[refPieces.length-1], ref);
             case "securitySchemes":
-                return toSecuritySchemeFilename(refPieces[3], ref);
+                return getFilename(CodegenKeyType.SECURITY_SCHEME, refPieces[3], ref);
         }
         return null;
     }
@@ -4751,16 +4462,16 @@ public class DefaultGenerator implements Generator {
     }
 
     protected String getModuleLocation(String ref) {
-        String filePath = getFilepath(ref);
-        String prefix = outputFolder + File.separatorChar + "src" + File.separatorChar;
+        String filePath = getFilePath(GeneratedFileType.CODE, ref);
+        String prefix = generatorSettings.outputFolder + File.separatorChar + "src" + File.separatorChar;
         String localFilepath = filePath.substring(prefix.length());
         return localFilepath.replaceAll(String.valueOf(File.separatorChar), ".");
     }
 
     @Override
     public String getRefModuleLocation(String ref) {
-        String filePath = getFilepath(ref);
-        String prefix = outputFolder + File.separatorChar + "src" + File.separatorChar;
+        String filePath = getFilePath(GeneratedFileType.CODE, ref);
+        String prefix = generatorSettings.outputFolder + File.separatorChar + "src" + File.separatorChar;
         int endIndex = filePath.lastIndexOf(File.separatorChar);
         String localFilepath = filePath.substring(prefix.length(), endIndex);
         return localFilepath.replaceAll(String.valueOf(File.separatorChar), ".");
@@ -4880,43 +4591,6 @@ public class DefaultGenerator implements Generator {
         return getKey(key, keyType, null);
     }
 
-    @Override
-    public String getSchemaPascalCaseName(String name, @NotNull String sourceJsonPath) {
-        String usedKey = escapeUnsafeCharacters(name);
-        HashMap<String, Integer> keyToQty = sourceJsonPathToKeyToQty.getOrDefault(sourceJsonPath, new HashMap<>());
-        if (!sourceJsonPathToKeyToQty.containsKey(sourceJsonPath)) {
-            sourceJsonPathToKeyToQty.put(sourceJsonPath, keyToQty);
-        }
-        // starts with number
-        if (usedKey.matches("^\\d.*")) {
-            LOGGER.warn("{} (component name starts with number) cannot be used as name. Renamed to Schema{}", usedKey, usedKey);
-            usedKey = "Schema" + usedKey; // 200 -> Schema200
-        }
-
-        usedKey = camelize(usedKey);
-
-        // handle case where usedKey is empty
-        if (usedKey.isEmpty()) {
-            // happens with a name like "/"
-            usedKey = camelize(toEnumVarName(name, null).toLowerCase(Locale.ROOT));
-        }
-
-        if (isReservedWord(usedKey)) {
-            usedKey = usedKey + "Schema"; // e.g. return => ReturnSchema
-            LOGGER.warn("{} (reserved word) cannot be used as name. Renamed to {}", name, usedKey);
-        }
-
-        Integer qty = keyToQty.getOrDefault(usedKey, 0);
-        qty += 1;
-        keyToQty.put(usedKey, qty);
-        String suffix = "";
-        if (qty > 1) {
-            suffix = qty.toString();
-        }
-        usedKey = usedKey + suffix;
-        return usedKey;
-    }
-
     protected String getCamelCaseName(String key) {
         String usedName = toEnumVarName(key, new StringSchema());
         usedName = camelize("set_"+ usedName.toLowerCase(Locale.ROOT), true);
@@ -4936,59 +4610,64 @@ public class DefaultGenerator implements Generator {
                 usedKey = escapeUnsafeCharacters(key);
                 isValid = isValid(usedKey);
                 snakeCaseName = toModelFilename(usedKey, sourceJsonPath);
-                pascalCaseName = getSchemaPascalCaseName(key, sourceJsonPath);
+                pascalCaseName = getPascalCase(CodegenKeyType.SCHEMA, key, sourceJsonPath);
                 camelCaseName = getCamelCaseName(usedKey);
                 break;
             case "paths":
                 usedKey = escapeUnsafeCharacters(key);
                 isValid = isValid(usedKey);
-                snakeCaseName = toPathFilename(usedKey, sourceJsonPath);
-                pascalCaseName = camelize(toPathFilename(usedKey, sourceJsonPath));
+                snakeCaseName = getFilename(CodegenKeyType.PATH, usedKey, sourceJsonPath);
+                pascalCaseName = getPascalCase(CodegenKeyType.PATH, usedKey, sourceJsonPath);
                 break;
             case "misc":
+                usedKey = escapeUnsafeCharacters(key);
+                isValid = isValid(usedKey);
+                snakeCaseName = toModelFilename(usedKey, sourceJsonPath);
+                camelCaseName = camelize(usedKey, true);
+                pascalCaseName = getPascalCase(CodegenKeyType.MISC, usedKey, sourceJsonPath);
+                break;
             case "verb":
                 usedKey = escapeUnsafeCharacters(key);
                 isValid = isValid(usedKey);
                 snakeCaseName = toModelFilename(usedKey, sourceJsonPath);
                 camelCaseName = camelize(usedKey, true);
-                pascalCaseName = toModelName(usedKey, sourceJsonPath);
+                pascalCaseName = getPascalCase(CodegenKeyType.OPERATION, usedKey, sourceJsonPath);
                 break;
             case "parameters":
                 usedKey = escapeUnsafeCharacters(key);
                 isValid = isValid(usedKey);
-                snakeCaseName = toParameterFilename(usedKey, sourceJsonPath);
-                pascalCaseName = getPascalCaseParameter(usedKey, sourceJsonPath);
+                snakeCaseName = getFilename(CodegenKeyType.PARAMETER, usedKey, sourceJsonPath);
+                pascalCaseName = getPascalCase(CodegenKeyType.PARAMETER, usedKey, sourceJsonPath);
                 break;
             case "requestBodies":
                 usedKey = escapeUnsafeCharacters(key);
                 isValid = isValid(usedKey);
-                snakeCaseName = toRequestBodyFilename(usedKey, sourceJsonPath);
-                // todo add getPascalCaseRequestBody()
-                pascalCaseName = toModelName(usedKey, sourceJsonPath);
+                snakeCaseName = getFilename(CodegenKeyType.REQUEST_BODY, usedKey, sourceJsonPath);
+                pascalCaseName = getPascalCase(CodegenKeyType.REQUEST_BODY, usedKey, sourceJsonPath);
                 break;
             case "headers":
                 usedKey = escapeUnsafeCharacters(key);
                 isValid = isValid(usedKey);
-                snakeCaseName = toHeaderFilename(usedKey, sourceJsonPath);
-                pascalCaseName = toModelName(usedKey, sourceJsonPath);
+                snakeCaseName = getFilename(CodegenKeyType.HEADER, usedKey, sourceJsonPath);
+                pascalCaseName = getPascalCase(CodegenKeyType.HEADER, usedKey, sourceJsonPath);
                 break;
             case "responses":
                 usedKey = escapeUnsafeCharacters(key);
                 isValid = isValid(usedKey);
-                snakeCaseName = toResponseModuleName(usedKey, sourceJsonPath);
-                pascalCaseName = getPascalCaseResponse(usedKey, sourceJsonPath);
+                snakeCaseName = getFilename(CodegenKeyType.RESPONSE, usedKey, sourceJsonPath);
+                pascalCaseName = getPascalCase(CodegenKeyType.RESPONSE, usedKey, sourceJsonPath);
                 break;
             case "securitySchemes":
                 usedKey = escapeUnsafeCharacters(key);
                 isValid = isValid(usedKey);
-                snakeCaseName = toSecuritySchemeFilename(usedKey, sourceJsonPath);
-                pascalCaseName = toModelName(usedKey, sourceJsonPath);
+                snakeCaseName = getFilename(CodegenKeyType.SECURITY_SCHEME, usedKey, sourceJsonPath);
+                pascalCaseName = getPascalCase(CodegenKeyType.SECURITY_SCHEME, usedKey, sourceJsonPath);
                 break;
             case "servers":
                 usedKey = escapeUnsafeCharacters(key);
                 isValid = isValid(usedKey);
-                snakeCaseName = toServerFilename(usedKey, sourceJsonPath);
-                pascalCaseName = getPascalCaseServer(usedKey, sourceJsonPath);
+                snakeCaseName = getFilename(CodegenKeyType.SERVER, usedKey, sourceJsonPath);
+                pascalCaseName = getPascalCase(CodegenKeyType.SERVER, usedKey, sourceJsonPath);
                 camelCaseName = camelize(pascalCaseName, true);
                 break;
             case "security":
@@ -4997,7 +4676,7 @@ public class DefaultGenerator implements Generator {
                 usedKey = escapeUnsafeCharacters(key);
                 isValid = isValid(usedKey);
                 snakeCaseName = toSecuritySnakeCase(key, sourceJsonPath);
-                pascalCaseName =  toSecurityPascalCase(key, sourceJsonPath);
+                pascalCaseName = getPascalCase(CodegenKeyType.SECURITY, usedKey, sourceJsonPath);
                 camelCaseName = camelize(pascalCaseName, true);
                 break;
         }
@@ -5014,8 +4693,9 @@ public class DefaultGenerator implements Generator {
         );
     }
 
+    @Deprecated
     protected String toSecurityPascalCase(String basename, String jsonPath) {
-        return toSecurityFilename(basename, jsonPath);
+        return getPascalCase(CodegenKeyType.SECURITY, basename, jsonPath);
     }
 
     protected String toSecuritySnakeCase(String basename, String jsonPath) {
@@ -5206,10 +4886,11 @@ public class DefaultGenerator implements Generator {
         for (Pair<String, Operation> pair: httpMethodOperationPairs) {
             Operation specOperation = pair.getRight();
             String httpMethod = pair.getLeft();
+            String operationJsonPath = jsonPath + "/" + httpMethod;
             if (specOperation != null) {
-                operations.put(getKey(
-                    httpMethod, "verb"),
-                    fromOperation(specOperation, jsonPath + "/" + httpMethod, pairToParameter, usedServers, rootSecurity)
+                operations.put(
+                    getKey(httpMethod, "verb", operationJsonPath),
+                    fromOperation(specOperation, operationJsonPath, pairToParameter, usedServers, rootSecurity)
                 );
             }
         }
@@ -5246,13 +4927,15 @@ public class DefaultGenerator implements Generator {
             CodegenKey jsonPathPiece = getKey(String.valueOf(i), "servers", serverJsonPath);
             CodegenText description = getCodegenText(server.getDescription());
             String subpackage = getSubpackage(serverJsonPath);
+            String pathFromDocRoot = getPathFromDocRoot(serverJsonPath);
             CodegenServer cs = new CodegenServer(
                 removeTrailingSlash(server.getUrl()),  // because trailing slash has no impact on server and path needs slash as first char
                 description,
                 fromServerVariables(server.getVariables(), serverJsonPath + "/variables"),
                 jsonPathPiece,
                 rootServer,
-                subpackage
+                subpackage,
+                pathFromDocRoot
             );
             codegenServers.add(cs);
         }
@@ -5265,7 +4948,6 @@ public class DefaultGenerator implements Generator {
             codegenServers,
             jsonPathPiece,
             serversSubpackage,
-            null,
             operationInputClass,
             operationInputVariableName,
             pathFromDocRoot
@@ -5315,85 +4997,6 @@ public class DefaultGenerator implements Generator {
     @Override
     public void postProcessFile(File file, String fileType) {
         LOGGER.debug("Post processing file {} ({})", file, fileType);
-    }
-
-    /**
-     * Boolean value indicating the state of the option for post-processing file using environment variables.
-     *
-     * @return true if the option is enabled
-     */
-    @Override
-    public boolean isEnablePostProcessFile() {
-        return enablePostProcessFile;
-    }
-
-    /**
-     * Set the boolean value indicating the state of the option for post-processing file using environment variables.
-     *
-     * @param enablePostProcessFile true to enable post-processing file
-     */
-    @Override
-    public void setEnablePostProcessFile(boolean enablePostProcessFile) {
-        this.enablePostProcessFile = enablePostProcessFile;
-    }
-
-    /**
-     * Get the boolean value indicating the state of the option for updating only changed files
-     */
-    @Override
-    public boolean isEnableMinimalUpdate() {
-        return enableMinimalUpdate;
-    }
-
-    /**
-     * Set the boolean value indicating the state of the option for updating only changed files
-     *
-     * @param enableMinimalUpdate true to enable minimal update
-     */
-    @Override
-    public void setEnableMinimalUpdate(boolean enableMinimalUpdate) {
-        this.enableMinimalUpdate = enableMinimalUpdate;
-    }
-
-    /**
-     * Sets the boolean valid indicating whether generation will work strictly against the specification, potentially making
-     * minor changes to the input document.
-     *
-     * @param strictSpecBehavior true if we will behave strictly, false to allow specification documents which pass validation to be loosely interpreted against the spec.
-     */
-    @Override
-    public void setStrictSpecBehavior(final boolean strictSpecBehavior) {
-        this.strictSpecBehavior = strictSpecBehavior;
-    }
-
-    @Override
-    public FeatureSet getFeatureSet() {
-        return this.generatorMetadata.getFeatureSet();
-    }
-
-    /**
-     * Get the boolean value indicating whether to remove enum value prefixes
-     */
-    @Override
-    public boolean isRemoveEnumValuePrefix() {
-        return this.removeEnumValuePrefix;
-    }
-
-    /**
-     * Set the boolean value indicating whether to remove enum value prefixes
-     *
-     * @param removeEnumValuePrefix true to enable enum value prefix removal
-     */
-    @Override
-    public void setRemoveEnumValuePrefix(final boolean removeEnumValuePrefix) {
-        this.removeEnumValuePrefix = removeEnumValuePrefix;
-    }
-
-    protected void modifyFeatureSet(Consumer<FeatureSet.Builder> processor) {
-        FeatureSet.Builder builder = getFeatureSet().modify();
-        processor.accept(builder);
-        this.generatorMetadata = GeneratorMetadata.newBuilder(generatorMetadata)
-                .featureSet(builder.build()).build();
     }
 
     /**
@@ -5466,16 +5069,6 @@ public class DefaultGenerator implements Generator {
     @Override
     public String defaultTemplatingEngine() {
         return "mustache";
-    }
-
-    @Override
-    public GeneratorLanguage generatorLanguage() {
-        return GeneratorLanguage.JAVA;
-    }
-
-    @Override
-    public String generatorLanguageVersion() {
-        return null;
     }
 
     /**

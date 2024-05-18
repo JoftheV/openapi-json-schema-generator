@@ -4,9 +4,8 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.openapijsonschematools.client.configurations.JsonSchemaKeywordFlags;
 import org.openapijsonschematools.client.configurations.SchemaConfiguration;
-import org.openapijsonschematools.client.schemas.validation.JsonSchema;
-import org.openapijsonschematools.client.schemas.validation.JsonSchemaFactory;
 import org.openapijsonschematools.client.exceptions.ValidationException;
+import org.openapijsonschematools.client.schemas.validation.JsonSchema;
 import org.openapijsonschematools.client.schemas.validation.PathToSchemasMap;
 import org.openapijsonschematools.client.schemas.validation.ValidationMetadata;
 
@@ -18,7 +17,7 @@ public class RefBooleanSchemaTest {
         public static class RefBooleanSchema1 extends BooleanJsonSchema.BooleanJsonSchema1 {}
     }
 
-    static final SchemaConfiguration configuration = new SchemaConfiguration(JsonSchemaKeywordFlags.ofNone());
+    static final SchemaConfiguration configuration = new SchemaConfiguration(new JsonSchemaKeywordFlags.Builder().build());
     static final BooleanJsonSchema.BooleanJsonSchema1 refBooleanJsonSchema = RefBooleanSchema.RefBooleanSchema1.getInstance();
     static final ValidationMetadata validationMetadata = new ValidationMetadata(
             List.of("args[0"),
@@ -28,13 +27,13 @@ public class RefBooleanSchemaTest {
     );
     
     @Test
-    public void testValidateTrue() {
+    public void testValidateTrue() throws ValidationException {
         Boolean validatedValue = refBooleanJsonSchema.validate(true, configuration);
         Assert.assertEquals(validatedValue, Boolean.TRUE);
     }
 
     @Test
-    public void testValidateFalse() {
+    public void testValidateFalse() throws ValidationException {
         Boolean validatedValue = refBooleanJsonSchema.validate(false, configuration);
         Assert.assertEquals(validatedValue, Boolean.FALSE);
     }

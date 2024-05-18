@@ -18,6 +18,7 @@ class Integer(
 ):
     types: typing.FrozenSet[typing.Type] = frozenset({
         int,
+        float,
     })
     format: str = 'int'
     inclusive_maximum: typing.Union[int, float] = 100
@@ -30,6 +31,7 @@ class Int32(
 ):
     types: typing.FrozenSet[typing.Type] = frozenset({
         int,
+        float,
     })
     format: str = 'int32'
     inclusive_maximum: typing.Union[int, float] = 200
@@ -103,7 +105,7 @@ Date: typing_extensions.TypeAlias = schemas.DateSchema
 
 
 @dataclasses.dataclass(frozen=True)
-class DateTime(
+class _DateTime(
     schemas.DateTimeSchema
 ):
     types: typing.FrozenSet[typing.Type] = frozenset({
@@ -138,7 +140,7 @@ Properties = typing.TypedDict(
         "byte": typing.Type[Byte],
         "binary": typing.Type[Binary],
         "date": typing.Type[Date],
-        "dateTime": typing.Type[DateTime],
+        "dateTime": typing.Type[_DateTime],
         "password": typing.Type[Password],
         "callback": typing.Type[Callback],
     }
@@ -207,11 +209,6 @@ class SchemaDict(schemas.immutabledict[str, schemas.OUTPUT_BASE_TYPES]):
             datetime.date,
             schemas.Unset
         ] = schemas.unset,
-        dateTime: typing.Union[
-            str,
-            datetime.datetime,
-            schemas.Unset
-        ] = schemas.unset,
         password: typing.Union[
             str,
             schemas.Unset
@@ -236,7 +233,6 @@ class SchemaDict(schemas.immutabledict[str, schemas.OUTPUT_BASE_TYPES]):
             ("string", string),
             ("binary", binary),
             ("date", date),
-            ("dateTime", dateTime),
             ("password", password),
             ("callback", callback),
         ):
@@ -338,16 +334,6 @@ class SchemaDict(schemas.immutabledict[str, schemas.OUTPUT_BASE_TYPES]):
     @property
     def date(self) -> typing.Union[str, schemas.Unset]:
         val = self.get("date", schemas.unset)
-        if isinstance(val, schemas.Unset):
-            return val
-        return typing.cast(
-            str,
-            val
-        )
-    
-    @property
-    def dateTime(self) -> typing.Union[str, schemas.Unset]:
-        val = self.get("dateTime", schemas.unset)
         if isinstance(val, schemas.Unset):
             return val
         return typing.cast(

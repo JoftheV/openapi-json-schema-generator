@@ -4,9 +4,8 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.openapijsonschematools.client.configurations.JsonSchemaKeywordFlags;
 import org.openapijsonschematools.client.configurations.SchemaConfiguration;
-import org.openapijsonschematools.client.schemas.validation.JsonSchema;
-import org.openapijsonschematools.client.schemas.validation.JsonSchemaFactory;
 import org.openapijsonschematools.client.exceptions.ValidationException;
+import org.openapijsonschematools.client.schemas.validation.JsonSchema;
 import org.openapijsonschematools.client.schemas.validation.PathToSchemasMap;
 import org.openapijsonschematools.client.schemas.validation.ValidationMetadata;
 
@@ -14,7 +13,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 
 public class NullSchemaTest {
-    static final SchemaConfiguration configuration = new SchemaConfiguration(JsonSchemaKeywordFlags.ofNone());
+    static final SchemaConfiguration configuration = new SchemaConfiguration(new JsonSchemaKeywordFlags.Builder().build());
     static final NullJsonSchema.NullJsonSchema1 nullJsonSchema = NullJsonSchema.NullJsonSchema1.getInstance();
     static final ValidationMetadata validationMetadata = new ValidationMetadata(
             List.of("args[0"),
@@ -26,7 +25,7 @@ public class NullSchemaTest {
 
     @Test
     @SuppressWarnings("nullness")
-    public void testValidateNull() {
+    public void testValidateNull() throws ValidationException {
         Void validatedValue = nullJsonSchema.validate(null, configuration);
         Assert.assertNull(validatedValue);
     }

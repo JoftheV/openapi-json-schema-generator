@@ -5,7 +5,6 @@ import org.junit.Test;
 import org.openapijsonschematools.client.configurations.JsonSchemaKeywordFlags;
 import org.openapijsonschematools.client.configurations.SchemaConfiguration;
 import org.openapijsonschematools.client.exceptions.ValidationException;
-import org.openapijsonschematools.client.exceptions.InvalidTypeException;
 import org.openapijsonschematools.client.schemas.validation.MapUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
@@ -15,7 +14,7 @@ import java.util.Map;
 import java.util.AbstractMap;
 
 public class UnevaluatedpropertiesSchemaTest {
-    static final SchemaConfiguration configuration = new SchemaConfiguration(JsonSchemaKeywordFlags.onlyFormat());
+    static final SchemaConfiguration configuration = new SchemaConfiguration(new JsonSchemaKeywordFlags.Builder().format().build());
 
     @Test
     public void testWithInvalidUnevaluatedPropertiesFails() {
@@ -32,13 +31,13 @@ public class UnevaluatedpropertiesSchemaTest {
                 configuration
             );
             throw new RuntimeException("A different exception must be thrown");
-        } catch (ValidationException | InvalidTypeException ignored) {
+        } catch (ValidationException ignored) {
             ;
         }
     }
 
     @Test
-    public void testWithNoUnevaluatedPropertiesPasses() {
+    public void testWithNoUnevaluatedPropertiesPasses() throws ValidationException {
         // with no unevaluated properties
         final var schema = UnevaluatedpropertiesSchema.UnevaluatedpropertiesSchema1.getInstance();
         schema.validate(
@@ -49,7 +48,7 @@ public class UnevaluatedpropertiesSchemaTest {
     }
 
     @Test
-    public void testWithValidUnevaluatedPropertiesPasses() {
+    public void testWithValidUnevaluatedPropertiesPasses() throws ValidationException {
         // with valid unevaluated properties
         final var schema = UnevaluatedpropertiesSchema.UnevaluatedpropertiesSchema1.getInstance();
         schema.validate(

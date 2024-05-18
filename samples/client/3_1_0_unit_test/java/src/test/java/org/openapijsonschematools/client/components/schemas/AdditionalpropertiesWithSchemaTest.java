@@ -5,7 +5,6 @@ import org.junit.Test;
 import org.openapijsonschematools.client.configurations.JsonSchemaKeywordFlags;
 import org.openapijsonschematools.client.configurations.SchemaConfiguration;
 import org.openapijsonschematools.client.exceptions.ValidationException;
-import org.openapijsonschematools.client.exceptions.InvalidTypeException;
 import org.openapijsonschematools.client.schemas.validation.MapUtils;
 import org.checkerframework.checker.nullness.qual.Nullable;
 
@@ -15,10 +14,10 @@ import java.util.Map;
 import java.util.AbstractMap;
 
 public class AdditionalpropertiesWithSchemaTest {
-    static final SchemaConfiguration configuration = new SchemaConfiguration(JsonSchemaKeywordFlags.onlyFormat());
+    static final SchemaConfiguration configuration = new SchemaConfiguration(new JsonSchemaKeywordFlags.Builder().format().build());
 
     @Test
-    public void testNoAdditionalPropertiesIsValidPasses() {
+    public void testNoAdditionalPropertiesIsValidPasses() throws ValidationException {
         // no additional properties is valid
         final var schema = AdditionalpropertiesWithSchema.AdditionalpropertiesWithSchema1.getInstance();
         schema.validate(
@@ -33,7 +32,7 @@ public class AdditionalpropertiesWithSchemaTest {
     }
 
     @Test
-    public void testAnAdditionalValidPropertyIsValidPasses() {
+    public void testAnAdditionalValidPropertyIsValidPasses() throws ValidationException {
         // an additional valid property is valid
         final var schema = AdditionalpropertiesWithSchema.AdditionalpropertiesWithSchema1.getInstance();
         schema.validate(
@@ -78,7 +77,7 @@ public class AdditionalpropertiesWithSchemaTest {
                 configuration
             );
             throw new RuntimeException("A different exception must be thrown");
-        } catch (ValidationException | InvalidTypeException ignored) {
+        } catch (ValidationException ignored) {
             ;
         }
     }

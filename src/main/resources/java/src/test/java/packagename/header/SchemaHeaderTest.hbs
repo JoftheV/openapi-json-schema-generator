@@ -5,7 +5,8 @@ import org.junit.Assert;
 import org.junit.Test;
 import {{{packageName}}}.configurations.JsonSchemaKeywordFlags;
 import {{{packageName}}}.configurations.SchemaConfiguration;
-import {{{packageName}}}.exceptions.InvalidTypeException;
+import {{{packageName}}}.exceptions.ValidationException;
+import {{{packageName}}}.exceptions.NotImplementedException;
 import {{{packageName}}}.schemas.AnyTypeJsonSchema;
 import {{{packageName}}}.schemas.ListJsonSchema;
 import {{{packageName}}}.schemas.NullJsonSchema;
@@ -28,12 +29,12 @@ public class SchemaHeaderTest {
     }
 
     @Test
-    public void testSerialization() {
+    public void testSerialization() throws ValidationException, NotImplementedException {
         var mapPayload = new LinkedHashMap<String, Integer>();
         mapPayload.put("R", 100);
         mapPayload.put("G", 200);
         mapPayload.put("B", 150);
-        var testCases = List.of(
+        List<ParamTestCase> testCases = List.of(
                 new ParamTestCase(
                         null,
                         Map.of("color", List.of(""))
@@ -85,7 +86,7 @@ public class SchemaHeaderTest {
                         true
                 )
         );
-        SchemaConfiguration configuration = new SchemaConfiguration(JsonSchemaKeywordFlags.ofNone());
+        SchemaConfiguration configuration = new SchemaConfiguration(new JsonSchemaKeywordFlags.Builder().build());
         BiPredicate<String, String> headerFilter = (key, val) -> true;
         for (ParamTestCase testCase: testCases) {
             var header = new SchemaHeader(
@@ -105,7 +106,7 @@ public class SchemaHeaderTest {
         );
         for (boolean value: Set.of(true, false)) {
             Assert.assertThrows(
-                    InvalidTypeException.class,
+                    NotImplementedException.class,
                     () -> boolHeader.serialize(value, "color", false, configuration)
             );
         }
@@ -126,36 +127,51 @@ public class SchemaHeaderTest {
     }
 
     @Test
-    public void testDeserialization() {
-        SchemaConfiguration configuration = new SchemaConfiguration(JsonSchemaKeywordFlags.ofNone());
+    public void testDeserialization() throws ValidationException, NotImplementedException {
+        SchemaConfiguration configuration = new SchemaConfiguration(new JsonSchemaKeywordFlags.Builder().build());
 
         SchemaHeader header = getHeader(NullJsonSchema.NullJsonSchema1.getInstance());
         @Nullable Object deserialized = header.deserialize(List.of(""), false, configuration);
         assertNull(deserialized);
 
         header = getHeader(NumberJsonSchema.NumberJsonSchema1.getInstance());
-        deserialized = header.deserialize(List.of("1"), false, configuration);
+        var deserializedOne = header.deserialize(List.of("1"), false, configuration);
+        if (deserializedOne == null) {
+            throw new RuntimeException("invalid value");
+        }
         @Nullable Object expected = 1L;
-        Assert.assertEquals(expected, deserialized);
+        Assert.assertEquals(expected, deserializedOne);
 
         header = getHeader(NumberJsonSchema.NumberJsonSchema1.getInstance());
-        deserialized = header.deserialize(List.of("3.14"), false, configuration);
+        var deserialized314 = header.deserialize(List.of("3.14"), false, configuration);
+        if (deserialized314 == null) {
+            throw new RuntimeException("invalid value");
+        }
         expected = 3.14d;
-        Assert.assertEquals(expected, deserialized);
+        Assert.assertEquals(expected, deserialized314);
 
         header = getHeader(StringJsonSchema.StringJsonSchema1.getInstance());
-        deserialized = header.deserialize(List.of("blue"), false, configuration);
+        var deserializedBlue = header.deserialize(List.of("blue"), false, configuration);
+        if (deserializedBlue == null) {
+            throw new RuntimeException("invalid value");
+        }
         expected = "blue";
-        Assert.assertEquals(expected, deserialized);
+        Assert.assertEquals(expected, deserializedBlue);
 
         header = getHeader(StringJsonSchema.StringJsonSchema1.getInstance());
-        deserialized = header.deserialize(List.of("hello world"), false, configuration);
+        var deserializedHelloWorld = header.deserialize(List.of("hello world"), false, configuration);
+        if (deserializedHelloWorld == null) {
+            throw new RuntimeException("invalid value");
+        }
         expected = "hello world";
-        Assert.assertEquals(expected, deserialized);
+        Assert.assertEquals(expected, deserializedHelloWorld);
 
         header = getHeader(ListJsonSchema.ListJsonSchema1.getInstance());
-        deserialized = header.deserialize(List.of("blue", "black", "brown"), false, configuration);
+        var deserializedList = header.deserialize(List.of("blue", "black", "brown"), false, configuration);
+        if (deserializedList == null) {
+            throw new RuntimeException("invalid value");
+        }
         expected = List.of("blue", "black", "brown");
-        Assert.assertEquals(expected, deserialized);
+        Assert.assertEquals(expected, deserializedList);
     }
 }

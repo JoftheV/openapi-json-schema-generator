@@ -5,9 +5,9 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.openapijsonschematools.client.configurations.JsonSchemaKeywordFlags;
 import org.openapijsonschematools.client.configurations.SchemaConfiguration;
+import org.openapijsonschematools.client.exceptions.ValidationException;
 import org.openapijsonschematools.client.schemas.validation.JsonSchema;
 import org.openapijsonschematools.client.schemas.validation.FrozenList;
-import org.openapijsonschematools.client.exceptions.ValidationException;
 import org.openapijsonschematools.client.schemas.validation.PathToSchemasMap;
 import org.openapijsonschematools.client.schemas.validation.ValidationMetadata;
 
@@ -16,7 +16,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 
 public class ListSchemaTest {
-    static final SchemaConfiguration configuration = new SchemaConfiguration(JsonSchemaKeywordFlags.ofNone());
+    static final SchemaConfiguration configuration = new SchemaConfiguration(new JsonSchemaKeywordFlags.Builder().build());
     static final ListJsonSchema.ListJsonSchema1 listJsonSchema = ListJsonSchema.ListJsonSchema1.getInstance();
     static final ValidationMetadata validationMetadata = new ValidationMetadata(
             List.of("args[0"),
@@ -35,7 +35,7 @@ public class ListSchemaTest {
     }
 
     @Test
-    public void testValidateList() {
+    public void testValidateList() throws ValidationException {
         List<Object> inList = new ArrayList<>();
         inList.add("today");
         FrozenList<@Nullable Object> validatedValue = listJsonSchema.validate(inList, configuration);
