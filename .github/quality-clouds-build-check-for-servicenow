@@ -1,0 +1,14 @@
+            - name: Quality Clouds Build Check for Servicenow
+  # You may pin to the exact commit or the version.
+  # uses: qualityclouds/action-application-scan@4d7fb9d7fb5f21c8379a6a55b36aff5a61b582a3
+  uses: qualityclouds/action-application-scan@1.0.0
+  with:
+    # You need to provide a valid API key to connect the Quality Clouds ruleset against which your code will be checked
+    token: 
+    # The instance url
+    instance_url: 
+    # Use cloud mode to runh a Feature branch scan
+    mode: # optional
+    # Use cloud mode to runh a Feature branch scan
+    api_url: # optional
+          
