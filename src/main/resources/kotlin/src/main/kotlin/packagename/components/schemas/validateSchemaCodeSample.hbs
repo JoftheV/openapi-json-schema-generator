@@ -1,0 +1,86 @@
+        {{#each typeToExample}}
+
+{{#eq @key "null"}}
+// null validation
+val {{../payloadVarName}}: Nothing? = {{../../../containerJsonPathPiece.pascalCase}}.{{../jsonPathPiece.pascalCase}}.validate(
+{{else}}
+    {{#eq @key "object"}}
+        {{#if ../mapOutputJsonPathPiece}}
+// Map validation
+val {{../payloadVarName}}: {{../../../containerJsonPathPiece.pascalCase}}.{{../mapOutputJsonPathPiece.pascalCase}} =
+    {{../../../containerJsonPathPiece.pascalCase}}.{{../jsonPathPiece.pascalCase}}.validate(
+        {{else}}
+// Map validation
+val {{../payloadVarName}}: FrozenMap<String, Any?> = {{../../../containerJsonPathPiece.pascalCase}}.{{../jsonPathPiece.pascalCase}}.validate(
+        {{/if}}
+    {{else}}
+        {{#eq @key "array"}}
+            {{#if ../arrayOutputJsonPathPiece}}
+// List validation
+val {{../payloadVarName}}: {{../../../containerJsonPathPiece.pascalCase}}.{{../arrayOutputJsonPathPiece.pascalCase}} =
+    {{../../../containerJsonPathPiece.pascalCase}}.{{../jsonPathPiece.pascalCase}}.validate(
+            {{else}}
+// List validation
+val {{../payloadVarName}}: FrozenList<Any?> = {{../../../containerJsonPathPiece.pascalCase}}.{{../jsonPathPiece.pascalCase}}.validate(
+            {{/if}}
+        {{else}}
+            {{#eq @key "string" }}
+// String validation
+val {{../payloadVarName}}: String = {{../../../containerJsonPathPiece.pascalCase}}.{{../jsonPathPiece.pascalCase}}.validate(
+            {{else}}
+                {{#eq @key "integer"}}
+                    {{#or (eq ../format null) (eq ../format "int64") }}
+// long validation
+val {{../payloadVarName}}: Long = {{../../../containerJsonPathPiece.pascalCase}}.{{../jsonPathPiece.pascalCase}}.validate(
+                    {{else}}
+// int validation
+val {{../payloadVarName}}: Int = {{../../../containerJsonPathPiece.pascalCase}}.{{../jsonPathPiece.pascalCase}}.validate(
+                    {{/or}}
+                {{else}}
+                    {{#eq @key "number"}}
+                        {{#eq ../format "int64"}}
+// long validation
+val {{../payloadVarName}}: Long = {{../../../containerJsonPathPiece.pascalCase}}.{{../jsonPathPiece.pascalCase}}.validate(
+                        {{else}}
+                            {{#eq ../format "float"}}
+// float validation
+val {{../payloadVarName}}: Float = {{../../../containerJsonPathPiece.pascalCase}}.{{../jsonPathPiece.pascalCase}}.validate(
+                            {{else}}
+                                {{#eq ../format "double"}}
+// double validation
+val {{../payloadVarName}}: Double = {{../../../containerJsonPathPiece.pascalCase}}.{{../jsonPathPiece.pascalCase}}.validate(
+                                {{else}}
+// int validation
+val {{../payloadVarName}}: Int = {{../../../containerJsonPathPiece.pascalCase}}.{{../jsonPathPiece.pascalCase}}.validate(
+                                {{/eq}}
+                            {{/eq}}
+                        {{/eq}}
+                    {{else}}
+                        {{#eq @key "boolean"}}
+// boolean validation
+val {{../payloadVarName}}: Boolean = {{../../../containerJsonPathPiece.pascalCase}}.{{../jsonPathPiece.pascalCase}}.validate(
+                        {{/eq}}
+                    {{/eq}}
+                {{/eq}}
+            {{/eq}}
+        {{/eq}}
+    {{/eq}}
+{{/eq}}
+            {{#with this}}
+                {{#and (eq type "array") ../arrayInputJsonPathPiece.pascalCase }}
+    {{../../../containerJsonPathPiece.pascalCase}}.{{../arrayInputJsonPathPiece.pascalCase}}()
+        {{> src/main/kotlin/packagename/components/schemas/helpers/payload_renderer endChar="" constructor=true }}
+    .build(),
+                {{else}}
+                    {{#and (eq type "object") ../mapInputJsonPathPiece.pascalCase }}
+    {{../../../containerJsonPathPiece.pascalCase}}.{{../mapInputJsonPathPiece.pascalCase}}()
+        {{> src/main/kotlin/packagename/components/schemas/helpers/payload_renderer endChar="" constructor=true optionalProperties=../optionalProperties requiredProperties=../requiredProperties }}
+    .build(),
+                    {{else}}
+    {{> src/main/kotlin/packagename/components/schemas/helpers/payload_renderer endChar="," }}
+                    {{/and}}
+                {{/and}}
+            {{/with}}
+    {{../configVarName}}
+)
+        {{/each}}
